@@ -4,6 +4,16 @@
  * @jenesis.release 25
  * @jenesis.bom pin-graalnix.properties
  * @jenesis.test org.graalnix
+ * @jenesis.pin jacoco/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin jacoco/module/build.jenesis.plugin.jacoco 0.1.0 SHA-256/2a3a9560feb3ddfe2a5294cd86a819d57c7d19e40a20c5fa08f2cd276b14d828
+ * @jenesis.pin jacoco:agent/maven/org.jacoco/org.jacoco.agent/jar/runtime 0.8.16 SHA-256/37ae2f374ad77e85c59c6e5b46565226c3ac3cb460ac19de0bcb844ac2f43e33
+ * @jenesis.pin jacoco:tool/maven/args4j/args4j 2.0.28 SHA-256/11b029a602e787e2bc08eb3b77eda1a4f5e8b263d22e3c5d6220cd5c51f30b18
+ * @jenesis.pin jacoco:tool/maven/org.jacoco/org.jacoco.cli 0.8.16 SHA-256/46f01f2816e719c7244505340ad055694a6b06086628af3888c3c35a5ea1a101
+ * @jenesis.pin jacoco:tool/maven/org.jacoco/org.jacoco.core 0.8.16 SHA-256/5d2db23c5d698e5645f47f07d1b6019ccd03e15cc933d60d1d4e798ac6bd1f84
+ * @jenesis.pin jacoco:tool/maven/org.jacoco/org.jacoco.report 0.8.16 SHA-256/c8e51b392b3689312e72ded4887fdbccb091ceed93207846e14d27f3b82e5f55
+ * @jenesis.pin jacoco:tool/maven/org.ow2.asm/asm 9.11.1 SHA-256/ae4e6e10d59d0a1500317764b21881ad883f8550e33c66e6142f7032c6fb566c
+ * @jenesis.pin jacoco:tool/maven/org.ow2.asm/asm-commons 9.11.1 SHA-256/6a5095ec53726156a78b2cd2efd45bc4e877754eca7c234f61224a53d6bfa661
+ * @jenesis.pin jacoco:tool/maven/org.ow2.asm/asm-tree 9.11.1 SHA-256/2b15c3c1b288a9fad3bb2cd6d988ba9521554914ed1f2a2029141fa3f483154a
  * @jenesis.pin palantir/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  * @jenesis.pin palantir/module/build.jenesis.plugin.palantir 0.1.0 SHA-256/7ed90f505775e2a785967c91f62cb7ce07de44377225cba2f3d4973908836401
  * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0

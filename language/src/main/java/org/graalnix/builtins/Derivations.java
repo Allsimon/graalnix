@@ -327,18 +327,22 @@ public final class Derivations {
 
     private static StringBuilder quoted(StringBuilder s, String v) {
         s.append('"');
+        int start = 0;
         for (int i = 0; i < v.length(); i++) {
-            char c = v.charAt(i);
-            switch (c) {
-                case '"' -> s.append("\\\"");
-                case '\\' -> s.append("\\\\");
-                case '\n' -> s.append("\\n");
-                case '\r' -> s.append("\\r");
-                case '\t' -> s.append("\\t");
-                default -> s.append(c);
+            String escape = switch (v.charAt(i)) {
+                case '"' -> "\\\"";
+                case '\\' -> "\\\\";
+                case '\n' -> "\\n";
+                case '\r' -> "\\r";
+                case '\t' -> "\\t";
+                default -> null;
+            };
+            if (escape != null) {
+                s.append(v, start, i).append(escape);
+                start = i + 1;
             }
         }
-        return s.append('"');
+        return s.append(v, start, v.length()).append('"');
     }
 
     /** Returns the ATerm of a derivation produced in this evaluation, or null. */
