@@ -10,7 +10,7 @@ import com.oracle.truffle.api.nodes.Node;
 import org.graalnix.runtime.Apply;
 import org.graalnix.runtime.NixLambda;
 
-public abstract class ApplyNode extends Node {
+public abstract sealed class ApplyNode extends Node permits ApplyNodeGen {
     public abstract Object execute(Object fn, Object arg);
 
     @Specialization(guards = "fn.target == cachedTarget", limit = "3")

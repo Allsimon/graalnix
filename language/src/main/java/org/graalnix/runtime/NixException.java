@@ -3,7 +3,7 @@ package org.graalnix.runtime;
 import com.oracle.truffle.api.exception.AbstractTruffleException;
 import com.oracle.truffle.api.nodes.Node;
 
-public class NixException extends AbstractTruffleException {
+public final class NixException extends AbstractTruffleException {
     /** Whether {@code builtins.tryEval} may catch this error ({@code throw} and failed assertions). */
     public final boolean catchable;
 
