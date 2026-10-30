@@ -1,0 +1,12 @@
+apiVersion: vendir.k14s.io/v1alpha1
+directories:
+- contents:
+  - git:
+      commitTitle: Merge remote-tracking branch 'nix-ghsa-m4vq-qf6v-82pj/fix-macos-sandbox-2.34'
+        into mitigations-2.34
+      sha: 5fb7eb7d64ba7b78819aa3ac6a7fdd21354910fc
+      tags:
+      - 2.34.9
+    path: .
+  path: language/src/test/java/lang
+kind: LockConfig

@@ -1,0 +1,5 @@
+# Symlinks of lang/, which the test jar stores as copies of their targets.
+lang/readDir/ldir foo
+lang/readDir/linked foo/git-hates-directories
+lang/symlink-resolution/foo/overlays ../overlays
+lang/symlink-resolution/broken nonexistent

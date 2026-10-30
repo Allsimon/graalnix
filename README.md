@@ -24,7 +24,7 @@ in `META-INF/build.jenesis/` next to the module's sources. To develop:
 
 ```sh
 nix develop
-java build/jenesis/Make.java                    # compile and run the tests (upstream lang + tests/graalnix)
+java build/jenesis/Make.java                    # compile and run the tests
 java build/jenesis/Execute.java eval -E '1 + 1'  # run the launcher on the JVM
 java -Djenesis.make.profiles=native build/jenesis/Make.java stage
                                                 # native launcher in target/stage/native/output
@@ -40,7 +40,7 @@ Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
 
 - **Language tests.** graalnix passes NixOS/nix's `tests/functional/lang`
   suite (303 tests) apart from the cases listed with reasons in
-  `tests/lang-skip.txt`.
+  `language/src/test/java/lang-skip.txt`.
 - **Top-level packages.** For every top-level nixpkgs attribute
   (`scripts/toplevel-drvpaths.nix`), graalnix and `nix-instantiate` produce
   24,268 identical drvPaths. 680 attributes fail in both, and none differ or
@@ -69,6 +69,12 @@ Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
   - `builtins/`: the builtins.
   - `store/`: NAR hashing, Nix base32 and store-path computation.
 - `launcher/`: the CLI, built on the polyglot API, plus its native-image build.
-- `tests/lang/`: vendored from NixOS/nix (LGPL-2.1).
-  `language/src/main/resources/org/graalnix/corepkgs/` holds Nix's
-  `derivation.nix` and `fetchurl.nix`, also vendored from NixOS/nix.
+- `language/src/test/java/`: the test module. Its data are packaged with it,
+  so the tests rerun whenever the data change:
+  - `lang/`: NixOS/nix's `tests/functional/lang` (LGPL-2.1), kept in sync
+    with [vendir](https://carvel.dev/vendir/). To follow a new Nix release,
+    change `ref` in `vendir.yml`, run `vendir sync`, and update
+    `lang-symlinks.txt` if upstream added symlinks (the jar cannot hold them).
+  - `graalnix/`: graalnix's own regression tests.
+- `language/src/main/java/org/graalnix/corepkgs/` holds Nix's `derivation.nix`
+  and `fetchurl.nix`, also vendored from NixOS/nix.

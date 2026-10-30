@@ -22,6 +22,7 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.graalvmPackages.graalvm-ce-musl
+            pkgs.vendir
           ];
           JAVA_HOME = pkgs.graalvmPackages.graalvm-ce-musl;
         };

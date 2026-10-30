@@ -4,11 +4,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.graalvm.polyglot.Context;
@@ -19,15 +26,53 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
-/** Runs NixOS/nix's tests/functional/lang suite the way lang.sh does, plus graalnix's own tests in tests/graalnix. */
+/** Runs NixOS/nix's tests/functional/lang suite the way lang.sh does, plus graalnix's own tests in graalnix/. */
 class LangTest {
-    private static final Path TESTS = Path.of(System.getProperty("graalnix.tests", "tests")).toAbsolutePath().normalize();
+    private static final Path TESTS = testsRoot();
     private static final Path LANG = TESTS.resolve("lang");
     private static final Path OWN = TESTS.resolve("graalnix");
     private static final Engine ENGINE = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build();
 
     /** Tests known to fail, with the reason; keep this list short and shrinking. */
     private static final Set<String> SKIP = skipList();
+
+    /**
+     * Extracts the test data from the test jar into a scratch directory and restores the symlinks listed in
+     * lang-symlinks.txt, which the jar holds as copies, or not at all when they dangle.
+     */
+    private static Path testsRoot() {
+        try {
+            Path root = Files.createTempDirectory("graalnix-tests");
+            URI jar = LangTest.class.getResource("/lang-skip.txt").toURI();
+            try (FileSystem fs = FileSystems.newFileSystem(jar, Map.of()); Stream<Path> files = Files.walk(fs.getPath("/"))) {
+                for (Path p : files.toList()) {
+                    Path dest = root.resolve(p.toString().substring(1));
+                    if (Files.isDirectory(p)) {
+                        Files.createDirectories(dest);
+                    } else {
+                        Files.copy(p, dest);
+                    }
+                }
+            }
+            for (String line : Files.readAllLines(root.resolve("lang-symlinks.txt"))) {
+                if (line.isBlank() || line.startsWith("#")) continue;
+                String[] link = line.split(" ");
+                Path at = root.resolve(link[0]);
+                deleteRecursively(at);
+                Files.createSymbolicLink(at, Path.of(link[1]));
+            }
+            return root;
+        } catch (IOException | URISyntaxException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void deleteRecursively(Path p) throws IOException {
+        if (!Files.exists(p, LinkOption.NOFOLLOW_LINKS)) return;
+        try (Stream<Path> s = Files.walk(p)) {
+            for (Path x : s.sorted(Comparator.reverseOrder()).toList()) Files.delete(x);
+        }
+    }
 
     private static Set<String> skipList() {
         try {
