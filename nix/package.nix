@@ -49,7 +49,7 @@ let
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-qCN5lu3IhNGCeSNc0qKJjg0KXahN47fhxOq5ThcDoHM=";
+    outputHash = "sha256-BU4qnebgf6jfwzBtcBfizx0e6o2NK0y4DVAyoAL97Ms=";
   };
 
   offline = ''
@@ -71,7 +71,11 @@ let
       java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict build/jenesis/Make.java
       runHook postBuild
     '';
-    installPhase = "touch $out";
+    installPhase = ''
+      runHook preInstall
+      cp -r target/build/modules/compose/module/*/produce/assemble/observed/observations/jacoco/report/output/reports/jacoco $out
+      runHook postInstall
+    '';
   };
 in
 stdenv.mkDerivation {
