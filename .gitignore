@@ -4,3 +4,8 @@ target/
 .jenesis/
 result
 .idea/
+.vscode/
+*.iml
+.classpath
+.project
+.settings/
