@@ -18,6 +18,11 @@
         default = graalnix;
       });
 
+      checks = forAllSystems (pkgs: {
+        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) graalnix;
+        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests;
+      });
+
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
