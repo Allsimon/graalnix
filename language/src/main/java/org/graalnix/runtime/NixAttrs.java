@@ -33,8 +33,10 @@ public final class NixAttrs {
 
     /** Same contract as {@link Arrays#binarySearch(Object[], Object)}, without the megamorphic {@code compareTo}. */
     public int indexOf(String key) {
-        int lo = 0;
-        int hi = keys.length - 1;
+        return indexOf(key, 0, keys.length - 1);
+    }
+
+    private int indexOf(String key, int lo, int hi) {
         while (lo <= hi) {
             int mid = (lo + hi) >>> 1;
             int c = keys[mid].compareTo(key);
@@ -76,24 +78,35 @@ public final class NixAttrs {
         String[] k = new String[n];
         Object[] v = new Object[n];
         SourceSection[] p = positions != null || right.positions != null ? new SourceSection[n] : null;
-        int i = 0, j = 0, o = 0;
-        while (i < keys.length || j < right.keys.length) {
-            int c = i == keys.length ? 1 : j == right.keys.length ? -1 : keys[i].compareTo(right.keys[j]);
-            if (c < 0) {
-                k[o] = keys[i];
-                v[o] = values[i];
-                if (p != null && positions != null) p[o] = positions[i];
-                i++;
-            } else {
-                k[o] = right.keys[j];
-                v[o] = right.values[j];
-                if (p != null && right.positions != null) p[o] = right.positions[j];
-                j++;
-                if (c == 0) i++;
-            }
+        int i = 0, o = 0;
+        for (int j = 0; j < right.keys.length; j++) {
+            int at = gallop(right.keys[j], i);
+            int end = at >= 0 ? at : -(at + 1);
+            o = copyRun(i, end, k, v, p, o);
+            k[o] = right.keys[j];
+            v[o] = right.values[j];
+            if (p != null && right.positions != null) p[o] = right.positions[j];
             o++;
+            i = at >= 0 ? end + 1 : end;
         }
+        o = copyRun(i, keys.length, k, v, p, o);
+        if (o == n) return new NixAttrs(k, v, p);
         return new NixAttrs(Arrays.copyOf(k, o), Arrays.copyOf(v, o), p == null ? null : Arrays.copyOf(p, o));
+    }
+
+    /** {@link #indexOf} restricted to keys from {@code from}, cheap when the key lies close to it. */
+    private int gallop(String key, int from) {
+        int bound = 1;
+        while (from + bound <= keys.length && keys[from + bound - 1].compareTo(key) < 0) bound <<= 1;
+        return indexOf(key, from + (bound >> 1), Math.min(from + bound, keys.length) - 1);
+    }
+
+    private int copyRun(int from, int to, String[] k, Object[] v, SourceSection[] p, int o) {
+        int length = to - from;
+        System.arraycopy(keys, from, k, o, length);
+        System.arraycopy(values, from, v, o, length);
+        if (p != null && positions != null) System.arraycopy(positions, from, p, o, length);
+        return o + length;
     }
 
     public boolean isDerivation() {

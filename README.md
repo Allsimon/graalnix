@@ -49,7 +49,7 @@ Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
 - **Top-level packages.** For every top-level nixpkgs attribute
   (`scripts/toplevel-drvpaths.nix`), graalnix and `nix-instantiate` produce
   24,268 identical drvPaths. 680 attributes fail in both, and none differ or
-  fail in only one evaluator. The run takes 3 min 08 s on the JVM, against
+  fail in only one evaluator. The run takes 1 min 50 s on the JVM, against
   2 min 08 s for Nix.
 - **Heavier attributes.** `scripts/parity.sh` finds identical drvPaths for
   `firefox`, `chromium`, `libreoffice`, `texliveFull`,
