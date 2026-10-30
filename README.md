@@ -24,15 +24,20 @@ in `META-INF/build.jenesis/` next to the module's sources. To develop:
 
 ```sh
 nix develop
-java build/jenesis/Make.java                    # compile and run the tests
+java build/jenesis/Make.java                    # compile, check formatting (palantir-java-format) and run the tests
+java -Djenesis.format.rewrite=true build/jenesis/Make.java   # reformat the sources instead
 java build/jenesis/Execute.java eval -E '1 + 1'  # run the launcher on the JVM
 java -Djenesis.make.profiles=native build/jenesis/Make.java stage
                                                 # native launcher in target/stage/native/output
 ```
 
-After changing a dependency, run `java build/jenesis/Make.java pin`. Then
-update `outputHash` of `deps` in `nix/package.nix`; `nix build .#graalnix.deps`
-prints the new hash.
+Dependency versions and checksums live in one bill of materials,
+`build.jenesis/pin-graalnix.properties`, which every module imports with
+`@jenesis.bom`. After changing a dependency, regenerate it with
+`java -Djenesis.pin.file=build.jenesis/pin-graalnix.properties build/jenesis/Make.java pin`
+and run `java build/jenesis/Make.java pin` for the tool pins left in the
+modules. Then update `outputHash` of `deps` in `nix/package.nix`;
+`nix build .#graalnix.deps` prints the new hash.
 
 ## Status
 

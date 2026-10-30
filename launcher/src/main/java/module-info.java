@@ -1,23 +1,34 @@
 /**
  * Command-line launcher for graalnix.
  *
- * <p>The language and the optimizing Truffle runtime are only required so that they are on the module path,
- * where the polyglot engine finds them as services.
+ * <p>Evaluates Nix expressions and computes derivation paths like nix-instantiate, without writing to the store.
  *
  * @jenesis.release 25
+ * @jenesis.bom pin-graalnix.properties
  * @jenesis.main org.graalnix.launcher.Main
  * @jenesis.native org.graalvm.truffle org.graalvm.truffle.runtime
- * @jenesis.pin org.graalvm.polyglot/polyglot 25.4.4.1.1 SHA-256/cbacc2628fd5f99dbcebff7d398bcddde43ea15ebadc873d1da4454c718727d8
- * @jenesis.pin org.graalvm.sdk/collections 25.4.4.1.1 SHA-256/1b72cb9c9db533991bc308f2026a6fe986a4ca44b70b68fa6a2bb6c2fb9887ea
- * @jenesis.pin org.graalvm.sdk/jniutils 25.4.4.1.1 SHA-256/a9d7e6830e5068dcd6b780ccf2903c075da04b1b2f1fa6c8197b4e9b06d4c075
- * @jenesis.pin org.graalvm.sdk/nativeimage 25.4.4.1.1 SHA-256/d633cb9895f01db443dbd2b6e54211cd505e679279f6745a84b1fee843156677
- * @jenesis.pin org.graalvm.sdk/word 25.4.4.1.1 SHA-256/f20b7adf174a8c61018ce4e717d9dda65fec27d00540e547e63f1bafa400ac9a
- * @jenesis.pin org.graalvm.truffle/truffle-api 25.4.4.1.1 SHA-256/9dcc81b6890d6fcc9ab57d17bc4430335f071d82b108c0af8556a28381978da6
- * @jenesis.pin org.graalvm.truffle/truffle-compiler 25.4.4.1.1 SHA-256/06e9dcc0ed60616a4e1785f18ad6836c82295af7ee22f0802c69d46d325aacb2
- * @jenesis.pin org.graalvm.truffle/truffle-runtime 25.4.4.1.1 SHA-256/25818863ef8e50fc6329a876a033055c7418f20bedb051cfbb31c3d895fad7c9
+ * @jenesis.pin palantir/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
+ * @jenesis.pin palantir/module/build.jenesis.plugin.palantir 0.1.0 SHA-256/7ed90f505775e2a785967c91f62cb7ce07de44377225cba2f3d4973908836401
+ * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0
+ * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.core/jackson-core 2.22.4 SHA-256/2d30c375cddea9657a1e1ef97547a2694b663b355facb4de53a097782b312d1a
+ * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.core/jackson-databind 2.22.4 SHA-256/d4cbf8947087f305869826801913abdc50735a1fab2074a1993e7bc67ca974a3
+ * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.datatype/jackson-datatype-guava 2.22.4 SHA-256/844d10482f84dc5a423124a766512a5dfe2ba20672343b64e884daf1afa9ee5a
+ * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.datatype/jackson-datatype-jdk8 2.22.4 SHA-256/2dea0c4f0a5dafaf1bd8b5e694090fe0043c29ba04367dbd38ec0869aca2bce9
+ * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.module/jackson-module-parameter-names 2.22.4 SHA-256/577cab851e0fd0e86efc51e63debf2155a8b7d0b5e177b64a4a12c89ccd4c328
+ * @jenesis.pin palantir:tool/maven/com.google.code.findbugs/jsr305 3.0.2 SHA-256/766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7
+ * @jenesis.pin palantir:tool/maven/com.google.errorprone/error_prone_annotations 2.50.0 SHA-256/4667724877f1d37a689202da191e23efa7657c62eef93ccdac406eccfe5cdd0a
+ * @jenesis.pin palantir:tool/maven/com.google.guava/failureaccess 1.0.3 SHA-256/cbfc3906b19b8f55dd7cfd6dfe0aa4532e834250d7f080bd8d211a3e246b59cb
+ * @jenesis.pin palantir:tool/maven/com.google.guava/guava 33.7.2-jre SHA-256/b530942257fb935f8b2cfaa5f8eb5bd59c555fd8e8d01b8ce98912e077ea606c
+ * @jenesis.pin palantir:tool/maven/com.google.guava/listenablefuture 9999.0-empty-to-avoid-conflict-with-guava SHA-256/b372a037d4230aa57fbeffdef30fd6123f9c0c2db85d0aced00c91b974f33f99
+ * @jenesis.pin palantir:tool/maven/com.google.j2objc/j2objc-annotations 3.1 SHA-256/84d3a150518485f8140ea99b8a985656749629f6433c92b80c75b36aba3b099b
+ * @jenesis.pin palantir:tool/maven/com.palantir.javaformat/palantir-java-format 2.103.0 SHA-256/19efbe85c7c51676f5b9b939762baacb3752eb9c39af1a2b38243acc41d1f552
+ * @jenesis.pin palantir:tool/maven/com.palantir.javaformat/palantir-java-format-spi 2.103.0 SHA-256/16f8d1c4b9d9d4a9faf93c27254249d65899b30a311493d2469f65ea784636ca
+ * @jenesis.pin palantir:tool/maven/org.functionaljava/functionaljava 5.0 SHA-256/377ad140e7d26ba04fadf219b09d7e1c74bc0232fa4010b20c1c79db11f9670e
+ * @jenesis.pin palantir:tool/maven/org.jspecify/jspecify 1.0.1 SHA-256/070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66
  */
 module org.graalnix.launcher {
     requires org.graalvm.polyglot;
+    // Required only to be on the module path, where the polyglot engine finds them as services.
     requires org.graalnix;
     requires org.graalvm.truffle.runtime;
 }
