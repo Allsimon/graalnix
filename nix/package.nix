@@ -71,9 +71,14 @@ let
       java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict build/jenesis/Make.java
       runHook postBuild
     '';
+    outputs = [
+      "out"
+      "coverage"
+    ];
     installPhase = ''
       runHook preInstall
-      cp -r target/build/modules/compose/module/*/produce/assemble/observed/observations/jacoco/report/output/reports/jacoco $out
+      touch $out
+      cp -r target/build/modules/compose/module/*/produce/assemble/observed/observations/jacoco/report/output/reports/jacoco $coverage
       runHook postInstall
     '';
   };

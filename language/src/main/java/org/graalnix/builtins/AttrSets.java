@@ -50,7 +50,14 @@ final class AttrSets {
             NixAttrs x = Types.attrs(a[0]);
             NixAttrs y = Types.attrs(a[1]);
             List<Integer> keep = new ArrayList<>();
-            for (int i = 0; i < y.size(); i++) if (x.has(y.keys[i])) keep.add(i);
+            if (x.size() < y.size()) {
+                for (String k : x.keys) {
+                    int j = y.indexOf(k);
+                    if (j >= 0) keep.add(j);
+                }
+            } else {
+                for (int i = 0; i < y.size(); i++) if (x.has(y.keys[i])) keep.add(i);
+            }
             return subset(y, keep);
         });
         b.add("catAttrs", 2, a -> {
