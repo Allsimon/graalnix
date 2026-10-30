@@ -1,0 +1,387 @@
+package org.graalnix.builtins;
+
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import org.graalnix.NixContext;
+import org.graalnix.runtime.*;
+import org.graalnix.store.Hashes;
+import org.graalnix.store.NixBase32;
+import org.graalnix.store.StorePaths;
+
+/** {@code derivationStrict}: builds the store derivation in memory and computes its paths without writing them. */
+public final class Derivations {
+    public static final String COREPKGS = "/__corepkgs__/";
+    public static final String FETCHURL_PATH = COREPKGS + "fetchurl.nix";
+
+    private Derivations() {}
+
+    record Output(String path, String hashAlgo, String hash) {}
+
+    static final class Drv {
+        String name;
+        final TreeMap<String, Output> outputs = new TreeMap<>();
+        final TreeMap<String, TreeSet<String>> inputDrvs = new TreeMap<>();
+        final TreeSet<String> inputSrcs = new TreeSet<>();
+        String platform;
+        String builder;
+        final List<String> args = new ArrayList<>();
+        final TreeMap<String, String> env = new TreeMap<>();
+        boolean fixed;
+    }
+
+    /** Derivations produced so far, by .drv path; stands in for reading them back from the store. */
+    private static final Map<String, Drv> DRVS = new HashMap<>();
+    private static final Map<String, Map<String, byte[]>> HASH_MODULO = new HashMap<>();
+
+    static void register(Builtins b) {
+        NixContext ctx = b.ctx;
+        b.add("derivationStrict", 1, a -> derivationStrict(ctx, Types.attrs(a[0])));
+        b.add("convertHash", 1, a -> {
+            NixAttrs args = Types.attrs(a[0]);
+            Object hashV = args.get("hash");
+            if (hashV == null) throw new NixException("attribute 'hash' missing");
+            Object algoV = args.get("hashAlgo");
+            Object formatV = args.get("toHashFormat");
+            if (formatV == null) throw new NixException("attribute 'toHashFormat' missing");
+            String[] h = parseAnyHash(Types.string(hashV).value, algoV == null ? null : Types.string(algoV).value);
+            byte[] bytes = HexFormat.of().parseHex(h[1]);
+            return new NixString(switch (Types.string(formatV).value) {
+                case "base16" -> h[1];
+                case "nix32", "base32" -> NixBase32.encode(bytes);
+                case "base64" -> Base64.getEncoder().encodeToString(bytes);
+                case "sri" -> h[0] + "-" + Base64.getEncoder().encodeToString(bytes);
+                default -> throw new NixException("unknown hash format '" + Types.string(formatV).value + "'");
+            });
+        });
+        b.values.put("derivation", new Thunk(() -> ctx.importFile(COREPKGS + "derivation.nix")));
+    }
+
+    private static NixException error(String drvName, String msg) {
+        return new NixException(msg + (drvName == null ? "" : " (while evaluating the derivation '" + drvName + "')"));
+    }
+
+    private static Object derivationStrict(NixContext ctx, NixAttrs attrs) {
+        Object nameV = attrs.get("name");
+        if (nameV == null) throw new NixException("required attribute 'name' missing");
+        String drvName = Coerce.toNixString(nameV, false, false).value;
+        try {
+            StorePaths.checkName(drvName);
+        } catch (IllegalArgumentException e) {
+            throw new NixException("invalid derivation name: " + e.getMessage());
+        }
+
+        Object ign = attrs.get("__ignoreNulls");
+        boolean ignoreNulls = ign != null && Types.bool(ign);
+        Object sa = attrs.get("__structuredAttrs");
+        boolean structured = sa != null && Types.bool(sa);
+
+        Drv drv = new Drv();
+        drv.name = drvName;
+        TreeSet<String> context = new TreeSet<>();
+        TreeSet<String> outputs = new TreeSet<>(List.of("out"));
+        String outputHash = null;
+        String outputHashAlgo = null;
+        String outputHashMode = null;
+        StringBuilder json = structured ? new StringBuilder("{") : null;
+
+        for (int i = 0; i < attrs.size(); i++) {
+            String key = attrs.keys[i];
+            if (key.equals("__ignoreNulls")) continue;
+            Object v = Thunk.force(attrs.values[i]);
+            if (ignoreNulls && v == NixNull.INSTANCE) continue;
+            if (key.equals("__contentAddressed") && Types.bool(v)) throw error(drvName, "content-addressed derivations are not supported");
+            if (key.equals("__impure") && Types.bool(v)) throw error(drvName, "impure derivations are not supported");
+            if (key.equals("args")) {
+                for (Object x : Types.list(v).items) {
+                    NixString s = Coerce.toNixString(x, true, true);
+                    if (s.context != null) context.addAll(s.context);
+                    drv.args.add(s.value);
+                }
+                continue;
+            }
+            if (structured) {
+                if (key.equals("__structuredAttrs")) continue;
+                NixString s = Json.toJson(v, true);
+                if (s.context != null) context.addAll(s.context);
+                if (json.length() > 1) json.append(',');
+                json.append(Json.toJson(new NixString(key), false).value).append(':').append(s.value);
+                switch (key) {
+                    case "builder" -> drv.builder = stringOf(v, context);
+                    case "system" -> drv.platform = stringOf(v, context);
+                    case "outputHash" -> outputHash = stringOf(v, context);
+                    case "outputHashAlgo" -> outputHashAlgo = stringOf(v, context);
+                    case "outputHashMode" -> outputHashMode = stringOf(v, context);
+                    case "outputs" -> outputs = outputNames(drvName, v);
+                    default -> {}
+                }
+            } else {
+                NixString s = Coerce.toNixString(v, true, true);
+                if (s.context != null) context.addAll(s.context);
+                drv.env.put(key, s.value);
+                switch (key) {
+                    case "builder" -> drv.builder = s.value;
+                    case "system" -> drv.platform = s.value;
+                    case "outputHash" -> outputHash = s.value;
+                    case "outputHashAlgo" -> outputHashAlgo = s.value;
+                    case "outputHashMode" -> outputHashMode = s.value;
+                    case "outputs" -> outputs = outputNames(drvName, v);
+                    default -> {}
+                }
+            }
+        }
+        if (structured) drv.env.put("__json", json.append('}').toString());
+        if (drv.builder == null) throw error(drvName, "required attribute 'builder' missing");
+        if (drv.platform == null) throw error(drvName, "required attribute 'system' missing");
+
+        for (String c : context) {
+            if (c.startsWith("=")) {
+                addDeepClosure(c.substring(1), drv);
+            } else if (c.startsWith("!")) {
+                int sep = c.indexOf('!', 1);
+                drv.inputDrvs.computeIfAbsent(c.substring(sep + 1), k -> new TreeSet<>()).add(c.substring(1, sep));
+            } else {
+                drv.inputSrcs.add(c);
+            }
+        }
+
+        if (outputHash != null) {
+            if (!outputs.equals(Set.of("out"))) throw error(drvName, "multiple outputs are not supported in fixed-output derivations");
+            String[] algoAndHash = parseAnyHash(outputHash, outputHashAlgo == null || outputHashAlgo.isEmpty() ? null : outputHashAlgo);
+            String algo = algoAndHash[0];
+            byte[] hash = HexFormat.of().parseHex(algoAndHash[1]);
+            String method = outputHashMode == null ? "flat" : outputHashMode;
+            String prefix = switch (method) {
+                case "flat" -> "";
+                case "recursive", "nar" -> "r:";
+                case "text" -> "text:";
+                default -> throw error(drvName, "invalid value '" + method + "' for 'outputHashMode' attribute");
+            };
+            String path = prefix.equals("text:")
+                    ? StorePaths.make(ctx.storeDir, "text", hash, drvName)
+                    : StorePaths.fixedOutput(ctx.storeDir, drvName, algo, hash, prefix.equals("r:"));
+            drv.env.put("out", path);
+            drv.outputs.put("out", new Output(path, prefix + algo, Hashes.hex(hash)));
+            drv.fixed = true;
+        } else {
+            for (String o : outputs) {
+                drv.env.put(o, "");
+                drv.outputs.put(o, new Output("", "", ""));
+            }
+            Map<String, byte[]> hashes = hashModulo(drv, true);
+            for (String o : outputs) {
+                String path = StorePaths.output(ctx.storeDir, drvName, o, hashes.get(o));
+                drv.env.put(o, path);
+                drv.outputs.put(o, new Output(path, "", ""));
+            }
+        }
+
+        TreeSet<String> refs = new TreeSet<>(drv.inputSrcs);
+        refs.addAll(drv.inputDrvs.keySet());
+        String drvPath = StorePaths.text(ctx.storeDir, drvName + ".drv", unparse(drv, false, null), refs);
+        DRVS.put(drvPath, drv);
+
+        TreeMap<String, Object> result = new TreeMap<>();
+        result.put("drvPath", new NixString(drvPath, Set.of("=" + drvPath)));
+        for (var o : drv.outputs.entrySet()) {
+            result.put(o.getKey(), new NixString(o.getValue().path(), Set.of("!" + o.getKey() + "!" + drvPath)));
+        }
+        return NixAttrs.of(result);
+    }
+
+    private static String stringOf(Object v, Set<String> context) {
+        NixString s = Types.string(v);
+        if (s.context != null) context.addAll(s.context);
+        return s.value;
+    }
+
+    private static TreeSet<String> outputNames(String drvName, Object v) {
+        TreeSet<String> outs = new TreeSet<>();
+        for (Object x : Types.list(v).items) {
+            String o = Types.string(x).value;
+            if (o.equals("drv")) throw error(drvName, "invalid derivation output name 'drv'");
+            if (!outs.add(o)) throw error(drvName, "duplicate derivation output '" + o + "'");
+        }
+        if (outs.isEmpty()) throw error(drvName, "derivation cannot have an empty set of outputs");
+        return outs;
+    }
+
+    private static void addDeepClosure(String drvPath, Drv drv) {
+        Drv dep = DRVS.get(drvPath);
+        if (dep == null) throw new NixException("derivation '" + drvPath + "' is not known to graalnix");
+        drv.inputSrcs.add(drvPath);
+        drv.inputDrvs.computeIfAbsent(drvPath, k -> new TreeSet<>()).addAll(dep.outputs.keySet());
+        for (String src : dep.inputSrcs) drv.inputSrcs.add(src);
+        for (String d : dep.inputDrvs.keySet()) addDeepClosure(d, drv);
+    }
+
+    /** Port of {@code hashDerivationModulo}. */
+    private static Map<String, byte[]> hashModulo(Drv drv, boolean mask) {
+        Map<String, byte[]> out = new TreeMap<>();
+        if (drv.fixed) {
+            Output o = drv.outputs.get("out");
+            out.put("out", Hashes.sha256("fixed:out:" + o.hashAlgo() + ":" + o.hash() + ":" + o.path()));
+            return out;
+        }
+        TreeMap<String, TreeSet<String>> inputs = new TreeMap<>();
+        for (var e : drv.inputDrvs.entrySet()) {
+            Map<String, byte[]> h = pathHashModulo(e.getKey());
+            for (String o : e.getValue()) {
+                byte[] oh = h.get(o);
+                if (oh == null) throw new NixException("no hash for output '" + o + "' of derivation '" + e.getKey() + "'");
+                inputs.computeIfAbsent(Hashes.hex(oh), k -> new TreeSet<>()).add(o);
+            }
+        }
+        byte[] hash = Hashes.sha256(unparse(drv, mask, inputs));
+        for (String o : drv.outputs.keySet()) out.put(o, hash);
+        return out;
+    }
+
+    private static Map<String, byte[]> pathHashModulo(String drvPath) {
+        Map<String, byte[]> h = HASH_MODULO.get(drvPath);
+        if (h == null) {
+            Drv d = DRVS.get(drvPath);
+            if (d == null) throw new NixException("derivation '" + drvPath + "' is not known to graalnix");
+            h = hashModulo(d, false);
+            HASH_MODULO.put(drvPath, h);
+        }
+        return h;
+    }
+
+    /** ATerm serialisation, as {@code Derivation::unparse}. */
+    static String unparse(Drv drv, boolean mask, TreeMap<String, TreeSet<String>> actualInputs) {
+        StringBuilder s = new StringBuilder("Derive([");
+        boolean first = true;
+        for (var e : drv.outputs.entrySet()) {
+            if (!first) s.append(',');
+            first = false;
+            Output o = e.getValue();
+            s.append('(');
+            raw(s, e.getKey()).append(',');
+            raw(s, mask ? "" : o.path()).append(',');
+            raw(s, o.hashAlgo()).append(',');
+            raw(s, o.hash()).append(')');
+        }
+        s.append("],[");
+        first = true;
+        for (var e : (actualInputs != null ? actualInputs : drv.inputDrvs).entrySet()) {
+            if (!first) s.append(',');
+            first = false;
+            s.append('(');
+            raw(s, e.getKey()).append(",[");
+            boolean f2 = true;
+            for (String o : e.getValue()) {
+                if (!f2) s.append(',');
+                f2 = false;
+                raw(s, o);
+            }
+            s.append("])");
+        }
+        s.append("],[");
+        first = true;
+        for (String src : drv.inputSrcs) {
+            if (!first) s.append(',');
+            first = false;
+            raw(s, src);
+        }
+        s.append("],");
+        quoted(s, drv.platform).append(',');
+        quoted(s, drv.builder).append(",[");
+        first = true;
+        for (String arg : drv.args) {
+            if (!first) s.append(',');
+            first = false;
+            quoted(s, arg);
+        }
+        s.append("],[");
+        first = true;
+        for (var e : drv.env.entrySet()) {
+            if (!first) s.append(',');
+            first = false;
+            s.append('(');
+            quoted(s, e.getKey()).append(',');
+            quoted(s, e.getValue()).append(')');
+        }
+        return s.append("])").toString();
+    }
+
+    private static StringBuilder raw(StringBuilder s, String v) {
+        return s.append('"').append(v).append('"');
+    }
+
+    private static StringBuilder quoted(StringBuilder s, String v) {
+        s.append('"');
+        for (int i = 0; i < v.length(); i++) {
+            char c = v.charAt(i);
+            switch (c) {
+                case '"' -> s.append("\\\"");
+                case '\\' -> s.append("\\\\");
+                case '\n' -> s.append("\\n");
+                case '\r' -> s.append("\\r");
+                case '\t' -> s.append("\\t");
+                default -> s.append(c);
+            }
+        }
+        return s.append('"');
+    }
+
+    /** Returns the ATerm of a derivation produced in this evaluation, or null. */
+    public static String show(String drvPath) {
+        Drv d = DRVS.get(drvPath);
+        return d == null ? null : unparse(d, false, null);
+    }
+
+    static byte[] parseHash(String s, String algo) {
+        return HexFormat.of().parseHex(parseAnyHash(s, algo)[1]);
+    }
+
+    /** Port of {@code newHashAllowEmpty}: returns the algorithm and the hash in hex. */
+    static String[] parseAnyHash(String s, String algo) {
+        if (s.isEmpty()) {
+            if (algo == null) throw new NixException("empty hash requires explicit hash algorithm");
+            return new String[] {algo, Hashes.hex(new byte[Hashes.size(algo)])};
+        }
+        String rest = s;
+        boolean sri = false;
+        int colon = s.indexOf(':');
+        int dash = s.indexOf('-');
+        if (colon > 0 && isAlgo(s.substring(0, colon))) {
+            algo = s.substring(0, colon);
+            rest = s.substring(colon + 1);
+        } else if (dash > 0 && isAlgo(s.substring(0, dash))) {
+            algo = s.substring(0, dash);
+            rest = s.substring(dash + 1);
+            sri = true;
+        }
+        if (algo == null) throw new NixException("hash '" + s + "' does not include a type, nor is the type otherwise known from context");
+        int size = Hashes.size(algo);
+        byte[] bytes;
+        try {
+            if (sri) {
+                bytes = Hashes.base64Decode(rest);
+            } else if (rest.length() == size * 2) {
+                bytes = HexFormat.of().parseHex(rest);
+            } else if (rest.length() == (size * 8 - 1) / 5 + 1) {
+                bytes = NixBase32.decode(rest, size);
+            } else if (rest.length() == (size + 2) / 3 * 4) {
+                bytes = Hashes.base64Decode(rest);
+            } else {
+                throw new IllegalArgumentException();
+            }
+        } catch (IllegalArgumentException e) {
+            throw new NixException("hash '" + s + "' has wrong length for hash algorithm '" + algo + "'");
+        }
+        if (bytes.length != size) throw new NixException("hash '" + s + "' has wrong length for hash algorithm '" + algo + "'");
+        return new String[] {algo, Hashes.hex(bytes)};
+    }
+
+    private static boolean isAlgo(String a) {
+        return a.equals("md5") || a.equals("sha1") || a.equals("sha256") || a.equals("sha512");
+    }
+}

@@ -1,0 +1,33 @@
+{
+  description = "graalnix: a Nix language implementation on GraalVM/Truffle";
+
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+  outputs =
+    { self, nixpkgs }:
+    let
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+    in
+    {
+      packages = forAllSystems (pkgs: rec {
+        graalnix = pkgs.callPackage ./nix/package.nix { };
+        default = graalnix;
+      });
+
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = [
+            pkgs.graalvmPackages.graalvm-ce-musl
+            pkgs.gradle_9
+          ];
+          JAVA_HOME = pkgs.graalvmPackages.graalvm-ce-musl;
+        };
+      });
+
+      formatter = forAllSystems (pkgs: pkgs.nixfmt-rfc-style);
+    };
+}
