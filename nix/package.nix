@@ -6,20 +6,27 @@
 let
   jdk = graalvmPackages.graalvm-ce-musl;
 
-  src = lib.fileset.toSource {
-    root = ../.;
-    fileset = lib.fileset.unions [
-      ../build/jenesis
-      ../build.jenesis
-      ../language/src/main
-      ../launcher/src/main
-    ];
-  };
+  sources =
+    paths:
+    lib.fileset.toSource {
+      root = ../.;
+      fileset = lib.fileset.unions (
+        [
+          ../build/jenesis
+          ../build.jenesis
+          ../language/src/main
+          ../launcher/src/main
+        ]
+        ++ paths
+      );
+    };
+  src = sources [ ];
+  testSrc = sources [ ../language/src/test ];
 
   # Every artifact is pinned by checksum in the module-info.java files, so this download is reproducible.
   deps = stdenv.mkDerivation {
     name = "graalnix-deps";
-    inherit src;
+    src = testSrc;
     nativeBuildInputs = [ jdk ];
     buildPhase = ''
       runHook preBuild
@@ -42,7 +49,29 @@ let
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-ZDAB44mCuEhnBr09ppvjUlmaHrT0PuZBN+vnE/1W2+k=";
+    outputHash = "sha256-qCN5lu3IhNGCeSNc0qKJjg0KXahN47fhxOq5ThcDoHM=";
+  };
+
+  offline = ''
+    export HOME=$TMPDIR MAVEN_REPOSITORY_LOCAL=$TMPDIR/maven JENESIS_REPOSITORY_LOCAL=$TMPDIR/modules
+    cp -r ${deps}/maven $MAVEN_REPOSITORY_LOCAL
+    cp -r ${deps}/modules $JENESIS_REPOSITORY_LOCAL
+    mkdir .jenesis
+    cp -r ${deps}/artifacts .jenesis/artifacts
+    chmod -R u+w $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL .jenesis
+  '';
+
+  tests = stdenv.mkDerivation {
+    name = "graalnix-tests";
+    src = testSrc;
+    nativeBuildInputs = [ jdk ];
+    buildPhase = ''
+      runHook preBuild
+      ${offline}
+      java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict build/jenesis/Make.java
+      runHook postBuild
+    '';
+    installPhase = "touch $out";
   };
 in
 stdenv.mkDerivation {
@@ -54,12 +83,7 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    export HOME=$TMPDIR MAVEN_REPOSITORY_LOCAL=$TMPDIR/maven JENESIS_REPOSITORY_LOCAL=$TMPDIR/modules
-    cp -r ${deps}/maven $MAVEN_REPOSITORY_LOCAL
-    cp -r ${deps}/modules $JENESIS_REPOSITORY_LOCAL
-    mkdir .jenesis
-    cp -r ${deps}/artifacts .jenesis/artifacts
-    chmod -R u+w $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL .jenesis
+    ${offline}
     java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
       -Djenesis.make.profiles=native build/jenesis/Make.java stage
     runHook postBuild
@@ -71,7 +95,7 @@ stdenv.mkDerivation {
     runHook postInstall
   '';
 
-  passthru = { inherit deps; };
+  passthru = { inherit deps tests; };
 
   meta = {
     description = "Nix language implementation on GraalVM/Truffle";
