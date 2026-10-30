@@ -5,9 +5,15 @@ import com.oracle.truffle.api.profiles.CountingConditionProfile;
 import org.graalnix.runtime.Types;
 
 public final class IfNode extends NixNode {
-    @Child private NixNode cond;
-    @Child private NixNode then;
-    @Child private NixNode otherwise;
+    @Child
+    private NixNode cond;
+
+    @Child
+    private NixNode then;
+
+    @Child
+    private NixNode otherwise;
+
     private final CountingConditionProfile profile = CountingConditionProfile.create();
 
     public IfNode(NixNode cond, NixNode then, NixNode otherwise) {

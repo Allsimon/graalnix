@@ -11,7 +11,8 @@ import java.util.regex.Pattern;
 /** Renders values the way {@code nix-instantiate --eval} does. */
 public final class Printer {
     private static final Pattern IDENT = Pattern.compile("[a-zA-Z_][a-zA-Z0-9_'-]*");
-    private static final Set<String> KEYWORDS = Set.of("if", "then", "else", "assert", "with", "let", "in", "rec", "inherit");
+    private static final Set<String> KEYWORDS =
+            Set.of("if", "then", "else", "assert", "with", "let", "in", "rec", "inherit");
 
     private final StringBuilder out = new StringBuilder();
     private final Set<Object> seen = Collections.newSetFromMap(new IdentityHashMap<>());

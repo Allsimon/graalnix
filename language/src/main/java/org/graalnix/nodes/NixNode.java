@@ -5,9 +5,27 @@ import com.oracle.truffle.api.nodes.Node;
 import com.oracle.truffle.api.source.SourceSection;
 
 public abstract sealed class NixNode extends Node
-        permits AssertNode, AttrKey, AttrsNode, BinaryNode, BindNode, CallNode, ConstantNode, ForceNode, HasAttrNode,
-                IfNode, InterpNode, LambdaBodyNode, LambdaNode, ListNode, LogicNode, NotNode, ReadVarNode, ScopeArgNode,
-                SelectNode, ThunkNode, WithVarNode {
+        permits AssertNode,
+                AttrKey,
+                AttrsNode,
+                BinaryNode,
+                BindNode,
+                CallNode,
+                ConstantNode,
+                ForceNode,
+                HasAttrNode,
+                IfNode,
+                InterpNode,
+                LambdaBodyNode,
+                LambdaNode,
+                ListNode,
+                LogicNode,
+                NotNode,
+                ReadVarNode,
+                ScopeArgNode,
+                SelectNode,
+                ThunkNode,
+                WithVarNode {
     private SourceSection section;
 
     /** Evaluates to weak head normal form: never returns a {@link org.graalnix.runtime.Thunk}. */

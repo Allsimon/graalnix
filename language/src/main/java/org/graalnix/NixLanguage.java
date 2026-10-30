@@ -23,20 +23,31 @@ public final class NixLanguage extends TruffleLanguage<NixContext> {
     @Option(help = "Search path, as in NIX_PATH.", category = OptionCategory.USER, stability = OptionStability.STABLE)
     static final OptionKey<String> NixPath = new OptionKey<>("");
 
-    @Option(help = "Value of builtins.currentSystem.", category = OptionCategory.USER, stability = OptionStability.STABLE)
+    @Option(
+            help = "Value of builtins.currentSystem.",
+            category = OptionCategory.USER,
+            stability = OptionStability.STABLE)
     static final OptionKey<String> System = new OptionKey<>("");
 
     @Option(help = "Nix store directory.", category = OptionCategory.USER, stability = OptionStability.STABLE)
     static final OptionKey<String> StoreDir = new OptionKey<>("");
 
-    @Option(help = "Output: eval, strict, json, raw or drv-path.", category = OptionCategory.USER, stability = OptionStability.STABLE)
+    @Option(
+            help = "Output: eval, strict, json, raw or drv-path.",
+            category = OptionCategory.USER,
+            stability = OptionStability.STABLE)
     static final OptionKey<String> Output = new OptionKey<>("eval");
 
-    @Option(help = "Attribute path to select, as with -A.", category = OptionCategory.USER, stability = OptionStability.STABLE)
+    @Option(
+            help = "Attribute path to select, as with -A.",
+            category = OptionCategory.USER,
+            stability = OptionStability.STABLE)
     static final OptionKey<String> Attr = new OptionKey<>("");
 
-    @Option(help = "Arguments for auto-calling, as kind\\u0002name\\u0002value entries separated by \\u0001.",
-            category = OptionCategory.USER, stability = OptionStability.STABLE)
+    @Option(
+            help = "Arguments for auto-calling, as kind\\u0002name\\u0002value entries separated by \\u0001.",
+            category = OptionCategory.USER,
+            stability = OptionStability.STABLE)
     static final OptionKey<String> Args = new OptionKey<>("");
 
     @Override

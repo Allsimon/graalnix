@@ -94,7 +94,8 @@ final class Toml {
                     arr = new ArrayList<>();
                     parent.put(last, arr);
                 } else if (existing instanceof List<?> && !sealed.contains(existing)) {
-                    @SuppressWarnings("unchecked") List<Object> l = (List<Object>) existing;
+                    @SuppressWarnings("unchecked")
+                    List<Object> l = (List<Object>) existing;
                     arr = l;
                 } else {
                     throw error("key '" + last + "' is already defined");
@@ -129,7 +130,10 @@ final class Toml {
                 table = t;
             } else if (v instanceof Map<?, ?> m && !sealed.contains(m)) {
                 table = (Map<String, Object>) m;
-            } else if (v instanceof List<?> l && !sealed.contains(l) && !l.isEmpty() && l.getLast() instanceof Map<?, ?> m) {
+            } else if (v instanceof List<?> l
+                    && !sealed.contains(l)
+                    && !l.isEmpty()
+                    && l.getLast() instanceof Map<?, ?> m) {
                 table = (Map<String, Object>) m;
             } else {
                 throw error("key '" + k + "' is already defined");
@@ -162,7 +166,8 @@ final class Toml {
                 parts.add(literalString());
             } else {
                 int start = i;
-                while (!eof() && (Character.isLetterOrDigit(peek()) && peek() < 128 || peek() == '_' || peek() == '-')) i++;
+                while (!eof() && (Character.isLetterOrDigit(peek()) && peek() < 128 || peek() == '_' || peek() == '-'))
+                    i++;
                 if (i == start) throw error("expected a key");
                 parts.add(s.substring(start, i));
             }
@@ -245,7 +250,9 @@ final class Toml {
             char c = peek();
             if (c < 128 && Character.isLetterOrDigit(c) || "+-_.:".indexOf(c) >= 0) {
                 i++;
-            } else if (c == ' ' && i + 1 < s.length() && Character.isDigit(s.charAt(i + 1))
+            } else if (c == ' '
+                    && i + 1 < s.length()
+                    && Character.isDigit(s.charAt(i + 1))
                     && s.substring(start, i).matches("\\d{4}-\\d{2}-\\d{2}")) {
                 i++;
             } else {
@@ -375,7 +382,8 @@ final class Toml {
             m.forEach((k, x) -> out.put((String) k, toNix(x)));
             return NixAttrs.of(out);
         }
-        if (v instanceof List<?> l) return new NixList(l.stream().map(Toml::toNix).toArray());
+        if (v instanceof List<?> l)
+            return new NixList(l.stream().map(Toml::toNix).toArray());
         if (v instanceof String str) return new NixString(str);
         return v;
     }

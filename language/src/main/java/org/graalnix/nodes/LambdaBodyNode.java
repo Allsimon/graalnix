@@ -14,14 +14,29 @@ import org.graalnix.runtime.Types;
 public final class LambdaBodyNode extends NixNode {
     private final String fnName;
     private final int argSlot;
-    @CompilationFinal(dimensions = 1) private final String[] formals;
-    @CompilationFinal(dimensions = 1) private final int[] formalSlots;
-    @Children private final NixNode[] defaults;
-    private final boolean ellipsis;
-    @Child private NixNode body;
 
-    public LambdaBodyNode(String fnName, int argSlot, String[] formals, int[] formalSlots, NixNode[] defaults,
-            boolean ellipsis, NixNode body) {
+    @CompilationFinal(dimensions = 1)
+    private final String[] formals;
+
+    @CompilationFinal(dimensions = 1)
+    private final int[] formalSlots;
+
+    @Children
+    private final NixNode[] defaults;
+
+    private final boolean ellipsis;
+
+    @Child
+    private NixNode body;
+
+    public LambdaBodyNode(
+            String fnName,
+            int argSlot,
+            String[] formals,
+            int[] formalSlots,
+            NixNode[] defaults,
+            boolean ellipsis,
+            NixNode body) {
         this.fnName = fnName;
         this.argSlot = argSlot;
         this.formals = formals;

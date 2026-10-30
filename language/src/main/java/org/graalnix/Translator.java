@@ -14,12 +14,12 @@ import java.util.TreeMap;
 import org.graalnix.nodes.*;
 import org.graalnix.parser.Ast.*;
 import org.graalnix.parser.ParseException;
+import org.graalnix.runtime.Coerce;
 import org.graalnix.runtime.NixAttrs;
 import org.graalnix.runtime.NixLambda;
 import org.graalnix.runtime.NixList;
 import org.graalnix.runtime.NixPath;
 import org.graalnix.runtime.NixString;
-import org.graalnix.runtime.Coerce;
 import org.graalnix.runtime.Thunk;
 
 /**
@@ -46,7 +46,8 @@ public final class Translator {
     private final Map<String, Object> globals;
     private int hiddenCounter;
 
-    private Translator(NixLanguage language, Source source, String fileName, String baseDir, Map<String, Object> globals) {
+    private Translator(
+            NixLanguage language, Source source, String fileName, String baseDir, Map<String, Object> globals) {
         this.language = language;
         this.source = source;
         this.fileName = fileName;
@@ -58,8 +59,14 @@ public final class Translator {
      * Translates a whole file. {@code scopeNames}, if any, are bound statically from the attribute set passed as
      * the root's second argument, as {@code scopedImport} requires.
      */
-    public static RootCallTarget translate(NixLanguage language, Source source, Expr expr, String fileName,
-            String baseDir, Map<String, Object> globals, String[] scopeNames) {
+    public static RootCallTarget translate(
+            NixLanguage language,
+            Source source,
+            Expr expr,
+            String fileName,
+            String baseDir,
+            Map<String, Object> globals,
+            String[] scopeNames) {
         Translator t = new Translator(language, source, fileName, baseDir, globals);
         Frame frame = new Frame();
         Map<String, Integer> vars = new HashMap<>();
@@ -94,12 +101,19 @@ public final class Translator {
             case Interp i -> interp(i, s);
             case SearchPath sp -> {
                 Pos pos = sp.pos();
-                yield tr(new Call(pos, new Var(pos, "__findFile"),
-                        List.of(new Var(pos, "__nixPath"), new StrLit(pos, sp.path()))), s);
+                yield tr(
+                        new Call(
+                                pos,
+                                new Var(pos, "__findFile"),
+                                List.of(new Var(pos, "__nixPath"), new StrLit(pos, sp.path()))),
+                        s);
             }
             case Var v -> var(v, s);
-            case Select sel -> new SelectNode(tr(sel.target(), s), keys(sel.path(), s),
-                    sel.fallback() == null ? null : tr(sel.fallback(), s));
+            case Select sel ->
+                new SelectNode(
+                        tr(sel.target(), s),
+                        keys(sel.path(), s),
+                        sel.fallback() == null ? null : tr(sel.fallback(), s));
             case HasAttr h -> new HasAttrNode(tr(h.target(), s), keys(h.path(), s));
             case Attrs a -> attrs(a, s);
             case ListExpr l -> {
@@ -120,15 +134,17 @@ public final class Translator {
                 Scope ws = new Scope(s, s.frame(), null, slot);
                 yield new BindNode(new int[] {slot}, new NixNode[] {lazy(w.scope(), s, null)}, tr(w.body(), ws));
             }
-            case Assert a -> new AssertNode(tr(a.cond(), s), tr(a.body(), s), text(a.cond().pos()));
+            case Assert a ->
+                new AssertNode(tr(a.cond(), s), tr(a.body(), s), text(a.cond().pos()));
             case If i -> new IfNode(tr(i.cond(), s), tr(i.then(), s), tr(i.otherwise(), s));
             case Not n2 -> new NotNode(tr(n2.operand(), s));
-            case BinOp b -> switch (b.op()) {
-                case AND -> new LogicNode(LogicNode.Kind.AND, tr(b.left(), s), tr(b.right(), s));
-                case OR -> new LogicNode(LogicNode.Kind.OR, tr(b.left(), s), tr(b.right(), s));
-                case IMPL -> new LogicNode(LogicNode.Kind.IMPL, tr(b.left(), s), tr(b.right(), s));
-                default -> new BinaryNode(b.op(), tr(b.left(), s), tr(b.right(), s));
-            };
+            case BinOp b ->
+                switch (b.op()) {
+                    case AND -> new LogicNode(LogicNode.Kind.AND, tr(b.left(), s), tr(b.right(), s));
+                    case OR -> new LogicNode(LogicNode.Kind.OR, tr(b.left(), s), tr(b.right(), s));
+                    case IMPL -> new LogicNode(LogicNode.Kind.IMPL, tr(b.left(), s), tr(b.right(), s));
+                    default -> new BinaryNode(b.op(), tr(b.left(), s), tr(b.right(), s));
+                };
             case CurPos c -> new ConstantNode(position(c.pos()));
         };
         return n.at(section(e.pos()));
@@ -168,7 +184,8 @@ public final class Translator {
     private NixNode thunk(Expr e, Scope s, String name) {
         Frame frame = new Frame();
         NixNode body = tr(e, new Scope(s, frame, null, -1), name);
-        NixRootNode root = new NixRootNode(language, frame.builder.build(), body, name == null ? "<thunk>" : name, section(e.pos()));
+        NixRootNode root = new NixRootNode(
+                language, frame.builder.build(), body, name == null ? "<thunk>" : name, section(e.pos()));
         return new ThunkNode(root.getCallTarget()).at(section(e.pos()));
     }
 
@@ -197,7 +214,9 @@ public final class Translator {
         }
         Object g = globals.get(name);
         if (g != null) return g instanceof Thunk t ? new ForceNode(new ConstantNode(t)) : new ConstantNode(g);
-        if (withs.isEmpty()) throw new ParseException("undefined variable '" + name + "'", v.pos().start());
+        if (withs.isEmpty())
+            throw new ParseException(
+                    "undefined variable '" + name + "'", v.pos().start());
         int[] depths = new int[withs.size()];
         int[] slots = new int[withs.size()];
         for (int i = 0; i < depths.length; i++) {
@@ -278,8 +297,12 @@ public final class Translator {
         boolean ellipsis = l.formals() != null && l.formals().ellipsis();
         LambdaBodyNode node = new LambdaBodyNode(name, argSlot, formals, formalSlots, defaults, ellipsis, body);
         node.at(section(l.pos()));
-        NixRootNode root = new NixRootNode(language, frame.builder.build(), node, name == null ? "<lambda>" : name, section(l.pos()));
-        return new LambdaNode(root.getCallTarget(), new NixLambda.LambdaInfo(name, l.arg(), formals, hasDefault, formalPositions, ellipsis, section(l.pos())));
+        NixRootNode root = new NixRootNode(
+                language, frame.builder.build(), node, name == null ? "<lambda>" : name, section(l.pos()));
+        return new LambdaNode(
+                root.getCallTarget(),
+                new NixLambda.LambdaInfo(
+                        name, l.arg(), formals, hasDefault, formalPositions, ellipsis, section(l.pos())));
     }
 
     /** Assigns hidden variables to the {@code inherit (from)} sources of a binding group. */
@@ -313,11 +336,13 @@ public final class Translator {
         for (var e : a.attrs.entrySet()) {
             AttrDef d = e.getValue();
             slots.add(vars.get(e.getKey()));
-            values.add(switch (d.kind()) {
-                case PLAIN -> lazyBinding(d.value(), rs, e.getKey());
-                case INHERITED -> lazy(d.value(), s, e.getKey());
-                case INHERITED_FROM -> thunk(inheritedFrom(sources.get(d.source()), e.getKey(), d.pos()), rs, e.getKey());
-            });
+            values.add(
+                    switch (d.kind()) {
+                        case PLAIN -> lazyBinding(d.value(), rs, e.getKey());
+                        case INHERITED -> lazy(d.value(), s, e.getKey());
+                        case INHERITED_FROM ->
+                            thunk(inheritedFrom(sources.get(d.source()), e.getKey(), d.pos()), rs, e.getKey());
+                    });
         }
         return rs;
     }
@@ -368,11 +393,13 @@ public final class Translator {
                 AttrDef d = sorted.get(keys[i]);
                 values[i] = switch (d.kind()) {
                     case PLAIN, INHERITED -> lazy(d.value(), s, keys[i]);
-                    case INHERITED_FROM -> thunk(inheritedFrom(sources.get(d.source()), keys[i], d.pos()), inner, keys[i]);
+                    case INHERITED_FROM ->
+                        thunk(inheritedFrom(sources.get(d.source()), keys[i], d.pos()), inner, keys[i]);
                 };
             }
         }
-        for (int i = 0; i < keys.length; i++) positions[i] = section(sorted.get(keys[i]).pos());
+        for (int i = 0; i < keys.length; i++)
+            positions[i] = section(sorted.get(keys[i]).pos());
         int nd = a.dynamic.size();
         NixNode[] dynNames = new NixNode[nd];
         NixNode[] dynValues = new NixNode[nd];
@@ -383,7 +410,10 @@ public final class Translator {
             dynValues[i] = lazy(d.value(), inner, null);
             dynPositions[i] = section(d.pos());
         }
-        NixNode node = new AttrsNode(keys, values, positions, dynNames, dynValues, dynPositions, overridesIndex, recSlots);
-        return slots.isEmpty() ? node : new BindNode(ints(slots), pre.toArray(new NixNode[0]), node.at(section(a.pos())));
+        NixNode node =
+                new AttrsNode(keys, values, positions, dynNames, dynValues, dynPositions, overridesIndex, recSlots);
+        return slots.isEmpty()
+                ? node
+                : new BindNode(ints(slots), pre.toArray(new NixNode[0]), node.at(section(a.pos())));
     }
 }

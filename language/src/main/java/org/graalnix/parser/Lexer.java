@@ -7,15 +7,35 @@ import java.util.regex.Pattern;
 /** Mirrors the longest-match rules of Nix's flex lexer (src/libexpr/lexer.l). */
 public final class Lexer {
     private static final Pattern FLOAT = Pattern.compile("(([1-9][0-9]*\\.[0-9]*)|(0?\\.[0-9]+))([Ee][+-]?[0-9]+)?");
-    private static final Pattern URI =
-            Pattern.compile("[a-zA-Z][a-zA-Z0-9+\\-.]*:[a-zA-Z0-9%/?:@&=+$,\\-_.!~*']+");
+    private static final Pattern URI = Pattern.compile("[a-zA-Z][a-zA-Z0-9+\\-.]*:[a-zA-Z0-9%/?:@&=+$,\\-_.!~*']+");
 
     private static final Map<String, TokenType> KEYWORDS = Map.of(
-            "if", TokenType.IF, "then", TokenType.THEN, "else", TokenType.ELSE, "assert", TokenType.ASSERT,
-            "with", TokenType.WITH, "let", TokenType.LET, "in", TokenType.IN, "rec", TokenType.REC,
-            "inherit", TokenType.INHERIT, "or", TokenType.OR_KW);
+            "if",
+            TokenType.IF,
+            "then",
+            TokenType.THEN,
+            "else",
+            TokenType.ELSE,
+            "assert",
+            TokenType.ASSERT,
+            "with",
+            TokenType.WITH,
+            "let",
+            TokenType.LET,
+            "in",
+            TokenType.IN,
+            "rec",
+            TokenType.REC,
+            "inherit",
+            TokenType.INHERIT,
+            "or",
+            TokenType.OR_KW);
 
-    public enum PartKind { LIT, INTERP, END }
+    public enum PartKind {
+        LIT,
+        INTERP,
+        END
+    }
 
     public record Part(PartKind kind, String text, boolean hasIndentation) {}
 
@@ -37,8 +57,13 @@ public final class Lexer {
     }
 
     static boolean isPathChar(char c) {
-        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9'
-                || c == '.' || c == '_' || c == '-' || c == '+';
+        return c >= 'a' && c <= 'z'
+                || c >= 'A' && c <= 'Z'
+                || c >= '0' && c <= '9'
+                || c == '.'
+                || c == '_'
+                || c == '-'
+                || c == '+';
     }
 
     private static boolean isIdStart(char c) {
@@ -168,7 +193,8 @@ public final class Lexer {
             boolean interp = false;
             if (best == TokenType.PATH || best == TokenType.HPATH) {
                 interp = startsWith("${", pos);
-                if (!interp && text.endsWith("/")) throw new ParseException("path '" + text + "' has a trailing slash", start);
+                if (!interp && text.endsWith("/"))
+                    throw new ParseException("path '" + text + "' has a trailing slash", start);
             }
             return new Token(best, text, start, pos, interp);
         }
@@ -195,15 +221,39 @@ public final class Lexer {
     }
 
     private static final Object[][] OPERATORS = {
-        {"...", TokenType.ELLIPSIS}, {"${", TokenType.DOLLAR_CURLY},
-        {"==", TokenType.EQ}, {"!=", TokenType.NEQ}, {"<=", TokenType.LEQ}, {">=", TokenType.GEQ},
-        {"&&", TokenType.AND}, {"||", TokenType.OR}, {"->", TokenType.IMPL}, {"//", TokenType.UPDATE},
-        {"++", TokenType.CONCAT}, {"|>", TokenType.PIPE_INTO}, {"<|", TokenType.PIPE_FROM},
-        {"{", TokenType.LBRACE}, {"}", TokenType.RBRACE}, {"[", TokenType.LBRACK}, {"]", TokenType.RBRACK},
-        {"(", TokenType.LPAREN}, {")", TokenType.RPAREN}, {";", TokenType.SEMI}, {":", TokenType.COLON},
-        {",", TokenType.COMMA}, {".", TokenType.DOT}, {"@", TokenType.AT}, {"?", TokenType.QUESTION},
-        {"=", TokenType.ASSIGN}, {"+", TokenType.PLUS}, {"-", TokenType.MINUS}, {"*", TokenType.STAR},
-        {"/", TokenType.SLASH}, {"<", TokenType.LT}, {">", TokenType.GT}, {"!", TokenType.NOT},
+        {"...", TokenType.ELLIPSIS},
+        {"${", TokenType.DOLLAR_CURLY},
+        {"==", TokenType.EQ},
+        {"!=", TokenType.NEQ},
+        {"<=", TokenType.LEQ},
+        {">=", TokenType.GEQ},
+        {"&&", TokenType.AND},
+        {"||", TokenType.OR},
+        {"->", TokenType.IMPL},
+        {"//", TokenType.UPDATE},
+        {"++", TokenType.CONCAT},
+        {"|>", TokenType.PIPE_INTO},
+        {"<|", TokenType.PIPE_FROM},
+        {"{", TokenType.LBRACE},
+        {"}", TokenType.RBRACE},
+        {"[", TokenType.LBRACK},
+        {"]", TokenType.RBRACK},
+        {"(", TokenType.LPAREN},
+        {")", TokenType.RPAREN},
+        {";", TokenType.SEMI},
+        {":", TokenType.COLON},
+        {",", TokenType.COMMA},
+        {".", TokenType.DOT},
+        {"@", TokenType.AT},
+        {"?", TokenType.QUESTION},
+        {"=", TokenType.ASSIGN},
+        {"+", TokenType.PLUS},
+        {"-", TokenType.MINUS},
+        {"*", TokenType.STAR},
+        {"/", TokenType.SLASH},
+        {"<", TokenType.LT},
+        {">", TokenType.GT},
+        {"!", TokenType.NOT},
     };
 
     private Token tok(TokenType type, int start) {

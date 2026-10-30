@@ -33,7 +33,9 @@ final class Files {
             String s = realPath(v);
             boolean mustBeDir = v instanceof NixString str && (str.value.endsWith("/") || str.value.endsWith("/."));
             Path p = Path.of(s);
-            return mustBeDir ? java.nio.file.Files.isDirectory(p) : java.nio.file.Files.exists(p, LinkOption.NOFOLLOW_LINKS);
+            return mustBeDir
+                    ? java.nio.file.Files.isDirectory(p)
+                    : java.nio.file.Files.exists(p, LinkOption.NOFOLLOW_LINKS);
         });
         b.add("readFile", 1, a -> new NixString(NixContext.readFile(realPath(a[0]))));
         b.add("readFileType", 1, a -> new NixString(Nar.typeOf(Path.of(realPath(a[0])))));
@@ -71,7 +73,8 @@ final class Files {
             if (contents.context != null) {
                 for (String c : contents.context) {
                     if (c.startsWith("!")) {
-                        throw new NixException("files created by builtins.toFile may not reference derivations, but '" + name + "' references '" + c + "'");
+                        throw new NixException("files created by builtins.toFile may not reference derivations, but '"
+                                + name + "' references '" + c + "'");
                     }
                     refs.add(c.startsWith("=") ? c.substring(1) : c);
                 }
@@ -84,18 +87,25 @@ final class Files {
         b.add("path", 1, a -> {
             NixAttrs args = Types.attrs(a[0]);
             Object pathV = args.get("path");
-            if (pathV == null) throw new NixException("missing required 'path' attribute in the first argument to builtins.path");
+            if (pathV == null)
+                throw new NixException("missing required 'path' attribute in the first argument to builtins.path");
             Object name = args.get("name");
             Object filter = args.getRaw("filter");
             Object rec = args.get("recursive");
             Object sha = args.get("sha256");
-            return addPath(ctx, realPath(pathV), name == null ? null : Types.string(name).value, filter,
-                    rec == null || Types.bool(rec), sha == null ? null : Types.string(sha).value);
+            return addPath(
+                    ctx,
+                    realPath(pathV),
+                    name == null ? null : Types.string(name).value,
+                    filter,
+                    rec == null || Types.bool(rec),
+                    sha == null ? null : Types.string(sha).value);
         });
     }
 
     static String utf8ToBytes(String s) {
-        return new String(s.getBytes(java.nio.charset.StandardCharsets.UTF_8), java.nio.charset.StandardCharsets.ISO_8859_1);
+        return new String(
+                s.getBytes(java.nio.charset.StandardCharsets.UTF_8), java.nio.charset.StandardCharsets.ISO_8859_1);
     }
 
     static void checkName(String name) {
@@ -111,11 +121,13 @@ final class Files {
         return slash < 0 ? p : p.substring(0, slash);
     }
 
-    private static Object addPath(NixContext ctx, String path, String name, Object filter, boolean recursive, String expected) {
+    private static Object addPath(
+            NixContext ctx, String path, String name, Object filter, boolean recursive, String expected) {
         if (name == null) name = Coerce.baseName(path);
         checkName(name);
         Path p = Path.of(path);
-        if (!java.nio.file.Files.exists(p, LinkOption.NOFOLLOW_LINKS)) throw new NixException("path '" + path + "' does not exist");
+        if (!java.nio.file.Files.exists(p, LinkOption.NOFOLLOW_LINKS))
+            throw new NixException("path '" + path + "' does not exist");
         String sp;
         try {
             if (expected != null) {
@@ -125,9 +137,11 @@ final class Files {
                 byte[] h = Hashes.sha256(NixContext.readFile(path));
                 sp = StorePaths.fixedOutput(ctx.storeDir, name, "sha256", h, false);
             } else {
-                BiPredicate<Path, String> pred = filter == null ? null
-                        : (child, type) -> Types.bool(Apply.apply(Apply.apply(filter,
-                                new NixString(utf8ToBytes(child.toString()))), new NixString(type)));
+                BiPredicate<Path, String> pred = filter == null
+                        ? null
+                        : (child, type) -> Types.bool(Apply.apply(
+                                Apply.apply(filter, new NixString(utf8ToBytes(child.toString()))),
+                                new NixString(type)));
                 sp = StorePaths.source(ctx.storeDir, name, Nar.hash("sha256", p, pred), java.util.List.of());
             }
         } catch (IOException e) {
@@ -159,6 +173,7 @@ final class Files {
             String candidate = Coerce.canonicalize(rest.isEmpty() ? base : base + "/" + rest);
             if (java.nio.file.Files.exists(Path.of(candidate))) return new NixPath(candidate);
         }
-        throw Builtins.catchable("file '" + path + "' was not found in the Nix search path (add it using $NIX_PATH or -I)");
+        throw Builtins.catchable(
+                "file '" + path + "' was not found in the Nix search path (add it using $NIX_PATH or -I)");
     }
 }

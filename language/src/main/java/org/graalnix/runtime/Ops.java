@@ -77,7 +77,8 @@ public final class Ops {
         }
         if (a instanceof NixPath p) {
             NixString s = Coerce.toNixString(b, false, false);
-            if (s.hasContext()) throw new NixException("a string that refers to a store path cannot be appended to a path");
+            if (s.hasContext())
+                throw new NixException("a string that refers to a store path cannot be appended to a path");
             return new NixPath(Coerce.canonicalize(p.path() + s.value));
         }
         NixString l = Coerce.toNixString(a, false, true);

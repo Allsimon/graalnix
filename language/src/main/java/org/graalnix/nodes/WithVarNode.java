@@ -12,8 +12,12 @@ import org.graalnix.runtime.Types;
 /** A variable bound by no lexical scope, looked up in the enclosing {@code with} scopes, innermost first. */
 public final class WithVarNode extends NixNode {
     private final String name;
-    @CompilationFinal(dimensions = 1) private final int[] depths;
-    @CompilationFinal(dimensions = 1) private final int[] slots;
+
+    @CompilationFinal(dimensions = 1)
+    private final int[] depths;
+
+    @CompilationFinal(dimensions = 1)
+    private final int[] slots;
 
     public WithVarNode(String name, int[] depths, int[] slots) {
         this.name = name;

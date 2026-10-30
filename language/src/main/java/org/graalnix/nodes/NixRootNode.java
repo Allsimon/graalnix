@@ -7,11 +7,14 @@ import com.oracle.truffle.api.source.SourceSection;
 
 /** Root of a file, thunk or lambda body. Arguments are {@code [parent frame, argument]}. */
 public final class NixRootNode extends com.oracle.truffle.api.nodes.RootNode {
-    @Child private NixNode body;
+    @Child
+    private NixNode body;
+
     private final String name;
     private final SourceSection section;
 
-    public NixRootNode(TruffleLanguage<?> language, FrameDescriptor descriptor, NixNode body, String name, SourceSection section) {
+    public NixRootNode(
+            TruffleLanguage<?> language, FrameDescriptor descriptor, NixNode body, String name, SourceSection section) {
         super(language, descriptor);
         this.body = body;
         this.name = name;

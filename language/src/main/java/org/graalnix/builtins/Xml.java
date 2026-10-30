@@ -32,7 +32,8 @@ final class Xml {
 
     private void attrs(TreeMap<String, String> attrs) {
         if (attrs == null) return;
-        attrs.forEach((k, v) -> out.append(' ').append(k).append("=\"").append(escape(v)).append('"'));
+        attrs.forEach((k, v) ->
+                out.append(' ').append(k).append("=\"").append(escape(v)).append('"'));
     }
 
     private void open(String name, TreeMap<String, String> attrs) {

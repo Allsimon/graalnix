@@ -10,9 +10,26 @@ import org.graalnix.runtime.*;
 
 public final class Builtins {
     /** Builtins that are also bound without the {@code __} prefix. */
-    private static final Set<String> GLOBAL = Set.of("abort", "baseNameOf", "break", "derivation", "derivationStrict",
-            "dirOf", "fetchGit", "fetchMercurial", "fetchTarball", "fetchTree", "fromTOML", "import", "isNull", "map",
-            "placeholder", "removeAttrs", "scopedImport", "throw", "toString");
+    private static final Set<String> GLOBAL = Set.of(
+            "abort",
+            "baseNameOf",
+            "break",
+            "derivation",
+            "derivationStrict",
+            "dirOf",
+            "fetchGit",
+            "fetchMercurial",
+            "fetchTarball",
+            "fetchTree",
+            "fromTOML",
+            "import",
+            "isNull",
+            "map",
+            "placeholder",
+            "removeAttrs",
+            "scopedImport",
+            "throw",
+            "toString");
 
     public static final String NIX_VERSION = "2.34.9";
 

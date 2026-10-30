@@ -26,8 +26,11 @@ final class Context {
                 throw new NixException("context of string '" + s.value + "' must have exactly one element");
             }
             String c = s.context.iterator().next();
-            if (c.startsWith("!")) throw new NixException("`addDrvOutputDependencies` can only act on derivations, not on a derivation output");
-            if (!c.startsWith("=") && !c.endsWith(".drv")) throw new NixException("path '" + c + "' is not a derivation");
+            if (c.startsWith("!"))
+                throw new NixException(
+                        "`addDrvOutputDependencies` can only act on derivations, not on a derivation output");
+            if (!c.startsWith("=") && !c.endsWith(".drv"))
+                throw new NixException("path '" + c + "' is not a derivation");
             return new NixString(s.value, java.util.Set.of(c.startsWith("=") ? c : "=" + c));
         });
         b.add("getContext", 1, a -> {
@@ -41,7 +44,8 @@ final class Context {
                         all.put(c.substring(1), true);
                     } else if (c.startsWith("!")) {
                         int sep = c.indexOf('!', 1);
-                        outputs.computeIfAbsent(c.substring(sep + 1), k -> new ArrayList<>()).add(new NixString(c.substring(1, sep)));
+                        outputs.computeIfAbsent(c.substring(sep + 1), k -> new ArrayList<>())
+                                .add(new NixString(c.substring(1, sep)));
                     } else {
                         paths.put(c, true);
                     }
@@ -56,7 +60,8 @@ final class Context {
                 TreeMap<String, Object> info = new TreeMap<>();
                 if (paths.containsKey(k)) info.put("path", true);
                 if (all.containsKey(k)) info.put("allOutputs", true);
-                if (outputs.containsKey(k)) info.put("outputs", new NixList(outputs.get(k).toArray()));
+                if (outputs.containsKey(k))
+                    info.put("outputs", new NixList(outputs.get(k).toArray()));
                 m.put(k, NixAttrs.of(info));
             }
             return NixAttrs.of(m);
@@ -72,13 +77,17 @@ final class Context {
                 if (p != null && Types.bool(p)) ctx.add(path);
                 Object all = info.get("allOutputs");
                 if (all != null && Types.bool(all)) {
-                    if (!path.endsWith(".drv")) throw new NixException("tried to add all-outputs context of " + path + ", which is not a derivation, to a string");
+                    if (!path.endsWith(".drv"))
+                        throw new NixException("tried to add all-outputs context of " + path
+                                + ", which is not a derivation, to a string");
                     ctx.add("=" + path);
                 }
                 Object outs = info.get("outputs");
                 if (outs != null) {
                     NixList l = Types.list(outs);
-                    if (l.size() > 0 && !path.endsWith(".drv")) throw new NixException("tried to add derivation output context of " + path + ", which is not a derivation, to a string");
+                    if (l.size() > 0 && !path.endsWith(".drv"))
+                        throw new NixException("tried to add derivation output context of " + path
+                                + ", which is not a derivation, to a string");
                     for (Object o : l.items) ctx.add("!" + Types.string(o).value + "!" + path);
                 }
             }

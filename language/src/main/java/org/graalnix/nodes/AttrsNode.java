@@ -13,21 +13,42 @@ import org.graalnix.runtime.NixNull;
 import org.graalnix.runtime.Types;
 
 public final class AttrsNode extends NixNode {
-    @CompilationFinal(dimensions = 1) private final String[] keys;
-    @Children private final NixNode[] values;
-    @CompilationFinal(dimensions = 1) private final SourceSection[] positions;
-    @Children private final NixNode[] dynNames;
-    @Children private final NixNode[] dynValues;
-    @CompilationFinal(dimensions = 1) private final SourceSection[] dynPositions;
+    @CompilationFinal(dimensions = 1)
+    private final String[] keys;
+
+    @Children
+    private final NixNode[] values;
+
+    @CompilationFinal(dimensions = 1)
+    private final SourceSection[] positions;
+
+    @Children
+    private final NixNode[] dynNames;
+
+    @Children
+    private final NixNode[] dynValues;
+
+    @CompilationFinal(dimensions = 1)
+    private final SourceSection[] dynPositions;
+
     private final int overridesIndex;
-    @CompilationFinal(dimensions = 1) private final int[] recSlots;
+
+    @CompilationFinal(dimensions = 1)
+    private final int[] recSlots;
 
     /**
      * {@code keys} must be sorted; values are evaluated lazily. For a {@code rec} set defining {@code __overrides},
      * {@code overridesIndex} is its key index and {@code recSlots} the slots of the keys.
      */
-    public AttrsNode(String[] keys, NixNode[] values, SourceSection[] positions, NixNode[] dynNames, NixNode[] dynValues,
-            SourceSection[] dynPositions, int overridesIndex, int[] recSlots) {
+    public AttrsNode(
+            String[] keys,
+            NixNode[] values,
+            SourceSection[] positions,
+            NixNode[] dynNames,
+            NixNode[] dynValues,
+            SourceSection[] dynPositions,
+            int overridesIndex,
+            int[] recSlots) {
         this.overridesIndex = overridesIndex;
         this.recSlots = recSlots;
         this.keys = keys;

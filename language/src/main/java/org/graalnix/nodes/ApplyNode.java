@@ -14,7 +14,9 @@ public abstract sealed class ApplyNode extends Node permits ApplyNodeGen {
     public abstract Object execute(Object fn, Object arg);
 
     @Specialization(guards = "fn.target == cachedTarget", limit = "3")
-    static Object direct(NixLambda fn, Object arg,
+    static Object direct(
+            NixLambda fn,
+            Object arg,
             @Cached("fn.target") RootCallTarget cachedTarget,
             @Cached("create(cachedTarget)") DirectCallNode call) {
         return call.call(fn.closure, arg);

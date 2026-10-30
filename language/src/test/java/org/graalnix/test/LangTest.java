@@ -31,7 +31,8 @@ class LangTest {
     private static final Path TESTS = testsRoot();
     private static final Path LANG = TESTS.resolve("lang");
     private static final Path OWN = TESTS.resolve("graalnix");
-    private static final Engine ENGINE = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build();
+    private static final Engine ENGINE =
+            Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build();
 
     /** Tests known to fail, with the reason; keep this list short and shrinking. */
     private static final Set<String> SKIP = skipList();
@@ -44,7 +45,8 @@ class LangTest {
         try {
             Path root = Files.createTempDirectory("graalnix-tests");
             URI jar = LangTest.class.getResource("/lang-skip.txt").toURI();
-            try (FileSystem fs = FileSystems.newFileSystem(jar, Map.of()); Stream<Path> files = Files.walk(fs.getPath("/"))) {
+            try (FileSystem fs = FileSystems.newFileSystem(jar, Map.of());
+                    Stream<Path> files = Files.walk(fs.getPath("/"))) {
                 for (Path p : files.toList()) {
                     Path dest = root.resolve(p.toString().substring(1));
                     if (Files.isDirectory(p)) {
@@ -77,7 +79,9 @@ class LangTest {
     private static Set<String> skipList() {
         try {
             return Set.copyOf(Files.readAllLines(TESTS.resolve("lang-skip.txt")).stream()
-                    .map(l -> l.replaceAll("#.*", "").trim()).filter(l -> !l.isEmpty()).toList());
+                    .map(l -> l.replaceAll("#.*", "").trim())
+                    .filter(l -> !l.isEmpty())
+                    .toList());
         } catch (IOException e) {
             return Set.of();
         }
@@ -96,7 +100,10 @@ class LangTest {
         List<Path> out = new ArrayList<>();
         for (Path dir : List.of(LANG, OWN)) {
             try (Stream<Path> s = Files.list(dir)) {
-                s.filter(p -> p.getFileName().toString().startsWith(prefix) && p.toString().endsWith(".nix")).sorted().forEach(out::add);
+                s.filter(p -> p.getFileName().toString().startsWith(prefix)
+                                && p.toString().endsWith(".nix"))
+                        .sorted()
+                        .forEach(out::add);
             }
         }
         return out;
@@ -112,14 +119,17 @@ class LangTest {
     }
 
     private static String eval(Path file, List<String> flags) throws IOException {
-        Context.Builder b = Context.newBuilder("nix").engine(ENGINE).allowAllAccess(true).option("nix.Output", "strict");
+        Context.Builder b =
+                Context.newBuilder("nix").engine(ENGINE).allowAllAccess(true).option("nix.Output", "strict");
         List<String> searchPath = new ArrayList<>();
         List<String> args = new ArrayList<>();
         for (int i = 0; i < flags.size(); i++) {
             switch (flags.get(i)) {
                 case "-I" -> searchPath.add(absolutise(flags.get(++i)));
                 case "-A" -> b.option("nix.Attr", flags.get(++i));
-                case "--arg" -> args.add("expr\u0002" + flags.get(++i) + "\u0002" + flags.get(++i).replace("lang/", LANG + "/"));
+                case "--arg" ->
+                    args.add("expr\u0002" + flags.get(++i) + "\u0002"
+                            + flags.get(++i).replace("lang/", LANG + "/"));
                 case "--argstr" -> args.add("str\u0002" + flags.get(++i) + "\u0002" + flags.get(++i));
                 default -> {}
             }
@@ -136,7 +146,9 @@ class LangTest {
 
     private static String absolutise(String entry) {
         int eq = entry.indexOf('=');
-        return eq < 0 ? TESTS.resolve(entry).toString() : entry.substring(0, eq + 1) + TESTS.resolve(entry.substring(eq + 1));
+        return eq < 0
+                ? TESTS.resolve(entry).toString()
+                : entry.substring(0, eq + 1) + TESTS.resolve(entry.substring(eq + 1));
     }
 
     private static List<String> flags(Path test) throws IOException {
@@ -165,9 +177,12 @@ class LangTest {
 
     @TestFactory
     Stream<DynamicTest> evalFail() throws IOException {
-        return tests("eval-fail-").stream().map(p -> test(p, () ->
-                assertThatThrownBy(() -> eval(p, flags(p))).isInstanceOf(PolyglotException.class)
-                        .matches(e -> !((PolyglotException) e).isInternalError(), "is not an internal error")));
+        return tests("eval-fail-").stream()
+                .map(p -> test(
+                        p,
+                        () -> assertThatThrownBy(() -> eval(p, flags(p)))
+                                .isInstanceOf(PolyglotException.class)
+                                .matches(e -> !((PolyglotException) e).isInternalError(), "is not an internal error")));
     }
 
     private static void parse(Path p) throws IOException {
@@ -181,8 +196,11 @@ class LangTest {
 
     @TestFactory
     Stream<DynamicTest> parseFail() throws IOException {
-        return tests("parse-fail-").stream().map(p -> test(p, () ->
-                assertThatThrownBy(() -> eval(p, List.of())).isInstanceOf(PolyglotException.class)
-                        .matches(e -> !((PolyglotException) e).isInternalError(), "is not an internal error")));
+        return tests("parse-fail-").stream()
+                .map(p -> test(
+                        p,
+                        () -> assertThatThrownBy(() -> eval(p, List.of()))
+                                .isInstanceOf(PolyglotException.class)
+                                .matches(e -> !((PolyglotException) e).isInternalError(), "is not an internal error")));
     }
 }

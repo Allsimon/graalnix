@@ -16,6 +16,12 @@ public final class NixLambda {
     }
 
     /** Formals are null for a plain {@code x: body} lambda. */
-    public record LambdaInfo(String name, String arg, String[] formals, boolean[] hasDefault, SourceSection[] formalPositions,
-            boolean ellipsis, SourceSection pos) {}
+    public record LambdaInfo(
+            String name,
+            String arg,
+            String[] formals,
+            boolean[] hasDefault,
+            SourceSection[] formalPositions,
+            boolean ellipsis,
+            SourceSection pos) {}
 }

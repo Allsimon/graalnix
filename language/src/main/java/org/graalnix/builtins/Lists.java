@@ -25,7 +25,8 @@ final class Lists {
         b.add("elemAt", 2, a -> {
             NixList l = Types.list(a[0]);
             long i = Types.integer(a[1]);
-            if (i < 0 || i >= l.size()) throw new NixException("'builtins.elemAt' called with index " + i + " on a list of size " + l.size());
+            if (i < 0 || i >= l.size())
+                throw new NixException("'builtins.elemAt' called with index " + i + " on a list of size " + l.size());
             return l.get((int) i);
         });
         b.add("map", 2, a -> {
@@ -91,7 +92,8 @@ final class Lists {
         b.add("groupBy", 2, a -> {
             TreeMap<String, List<Object>> groups = new TreeMap<>();
             for (Object x : Types.list(a[1]).items) {
-                groups.computeIfAbsent(Types.string(Apply.apply(a[0], x)).value, k -> new ArrayList<>()).add(x);
+                groups.computeIfAbsent(Types.string(Apply.apply(a[0], x)).value, k -> new ArrayList<>())
+                        .add(x);
             }
             TreeMap<String, Object> m = new TreeMap<>();
             groups.forEach((k, v) -> m.put(k, new NixList(v.toArray())));

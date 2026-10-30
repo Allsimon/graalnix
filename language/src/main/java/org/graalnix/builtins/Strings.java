@@ -17,7 +17,8 @@ final class Strings {
 
     static void register(Builtins b) {
         b.add("toString", 1, a -> Coerce.toNixString(a[0], true, false));
-        b.add("stringLength", 1, a -> (long) Coerce.toNixString(a[0], false, true).value.length());
+        b.add("stringLength", 1, a ->
+                (long) Coerce.toNixString(a[0], false, true).value.length());
         b.add("substring", 3, a -> {
             long start = Types.integer(a[0]);
             long len = Types.integer(a[1]);
@@ -131,7 +132,8 @@ final class Strings {
         NixList from = Types.list(fromV);
         NixList to = Types.list(toV);
         if (from.size() != to.size()) {
-            throw new NixException("'from' and 'to' arguments passed to builtins.replaceStrings have different lengths");
+            throw new NixException(
+                    "'from' and 'to' arguments passed to builtins.replaceStrings have different lengths");
         }
         String[] fromS = new String[from.size()];
         for (int i = 0; i < fromS.length; i++) fromS[i] = Types.string(from.items[i]).value;
@@ -190,10 +192,18 @@ final class Strings {
     }
 
     private static final Map<String, String> CLASSES = Map.ofEntries(
-            Map.entry("alpha", "\\p{Alpha}"), Map.entry("digit", "0-9"), Map.entry("alnum", "\\p{Alnum}"),
-            Map.entry("upper", "\\p{Upper}"), Map.entry("lower", "\\p{Lower}"), Map.entry("space", "\\s\\x0B"),
-            Map.entry("blank", " \\t"), Map.entry("punct", "\\p{Punct}"), Map.entry("print", "\\p{Print}"),
-            Map.entry("graph", "\\p{Graph}"), Map.entry("cntrl", "\\p{Cntrl}"), Map.entry("xdigit", "0-9A-Fa-f"));
+            Map.entry("alpha", "\\p{Alpha}"),
+            Map.entry("digit", "0-9"),
+            Map.entry("alnum", "\\p{Alnum}"),
+            Map.entry("upper", "\\p{Upper}"),
+            Map.entry("lower", "\\p{Lower}"),
+            Map.entry("space", "\\s\\x0B"),
+            Map.entry("blank", " \\t"),
+            Map.entry("punct", "\\p{Punct}"),
+            Map.entry("print", "\\p{Print}"),
+            Map.entry("graph", "\\p{Graph}"),
+            Map.entry("cntrl", "\\p{Cntrl}"),
+            Map.entry("xdigit", "0-9A-Fa-f"));
 
     /** Translates a POSIX extended regular expression to {@link Pattern} syntax. */
     static String translateRegex(String re) {
@@ -257,7 +267,8 @@ final class Strings {
         if (isDigit(s.charAt(p[0]))) {
             while (p[0] < s.length() && isDigit(s.charAt(p[0]))) p[0]++;
         } else {
-            while (p[0] < s.length() && !isDigit(s.charAt(p[0])) && s.charAt(p[0]) != '.' && s.charAt(p[0]) != '-') p[0]++;
+            while (p[0] < s.length() && !isDigit(s.charAt(p[0])) && s.charAt(p[0]) != '.' && s.charAt(p[0]) != '-')
+                p[0]++;
         }
         return s.substring(start, p[0]);
     }

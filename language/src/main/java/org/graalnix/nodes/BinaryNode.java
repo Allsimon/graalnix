@@ -7,8 +7,12 @@ import org.graalnix.runtime.Ops;
 /** Strict binary operators. */
 public final class BinaryNode extends NixNode {
     private final Op op;
-    @Child private NixNode left;
-    @Child private NixNode right;
+
+    @Child
+    private NixNode left;
+
+    @Child
+    private NixNode right;
 
     public BinaryNode(Op op, NixNode left, NixNode right) {
         this.op = op;

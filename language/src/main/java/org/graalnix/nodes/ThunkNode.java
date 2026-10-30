@@ -8,7 +8,9 @@ import org.graalnix.runtime.Thunk;
 /** An expression in a lazy position, compiled as its own root so that it can be suspended. */
 public final class ThunkNode extends NixNode {
     private final RootCallTarget target;
-    @Child private DirectCallNode direct;
+
+    @Child
+    private DirectCallNode direct;
 
     public ThunkNode(RootCallTarget target) {
         this.target = target;

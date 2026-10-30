@@ -51,7 +51,8 @@ public final class Nar {
     }
 
     private void num(long n) {
-        md.update(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(n).array());
+        md.update(
+                ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(n).array());
     }
 
     private void pad(long n) {

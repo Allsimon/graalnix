@@ -9,9 +9,14 @@ import org.graalnix.runtime.Thunk;
 import org.graalnix.runtime.Types;
 
 public final class SelectNode extends NixNode {
-    @Child private NixNode target;
-    @Children private final AttrKey[] path;
-    @Child private NixNode fallback;
+    @Child
+    private NixNode target;
+
+    @Children
+    private final AttrKey[] path;
+
+    @Child
+    private NixNode fallback;
 
     public SelectNode(NixNode target, AttrKey[] path, NixNode fallback) {
         this.target = target;

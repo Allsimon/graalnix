@@ -115,7 +115,8 @@ public final class Parser {
                     parseBinds(binds, IN);
                     expect(IN);
                     for (DynAttr d : binds.dynamic) {
-                        throw new ParseException("dynamic attributes not allowed in let", d.pos().start());
+                        throw new ParseException(
+                                "dynamic attributes not allowed in let", d.pos().start());
                     }
                     Expr body = parseExpr();
                     return new Let(from(start), binds, body);
@@ -319,7 +320,8 @@ public final class Parser {
             }
             case SPATH -> {
                 advance();
-                return new SearchPath(from(start), t.text().substring(1, t.text().length() - 1));
+                return new SearchPath(
+                        from(start), t.text().substring(1, t.text().length() - 1));
             }
             case URI -> {
                 advance();
@@ -563,9 +565,11 @@ public final class Parser {
                     }
                     Pos pos = from(nameStart);
                     if (attrs.attrs.containsKey(name.name())) throw dupAttr(name.name(), nameStart);
-                    attrs.attrs.put(name.name(), source == null
-                            ? new AttrDef(new Var(pos, name.name()), pos, AttrKind.INHERITED, null)
-                            : new AttrDef(null, pos, AttrKind.INHERITED_FROM, source));
+                    attrs.attrs.put(
+                            name.name(),
+                            source == null
+                                    ? new AttrDef(new Var(pos, name.name()), pos, AttrKind.INHERITED, null)
+                                    : new AttrDef(null, pos, AttrKind.INHERITED_FROM, source));
                 }
                 advance();
             } else {
@@ -619,9 +623,12 @@ public final class Parser {
             attrs.attrs.put(last.name(), new AttrDef(value, pos, AttrKind.PLAIN, null));
             return;
         }
-        if (existing.kind() != AttrKind.INHERITED && existing.value() instanceof Attrs target && value instanceof Attrs ae) {
+        if (existing.kind() != AttrKind.INHERITED
+                && existing.value() instanceof Attrs target
+                && value instanceof Attrs ae) {
             for (var e : ae.attrs.entrySet()) {
-                if (target.attrs.containsKey(e.getKey())) throw dupAttr(e.getKey(), e.getValue().pos().start());
+                if (target.attrs.containsKey(e.getKey()))
+                    throw dupAttr(e.getKey(), e.getValue().pos().start());
                 target.attrs.put(e.getKey(), e.getValue());
             }
             target.dynamic.addAll(ae.dynamic);

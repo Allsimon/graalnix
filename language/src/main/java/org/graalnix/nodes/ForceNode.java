@@ -4,7 +4,8 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import org.graalnix.runtime.Thunk;
 
 public final class ForceNode extends NixNode {
-    @Child private NixNode value;
+    @Child
+    private NixNode value;
 
     public ForceNode(NixNode value) {
         this.value = value;

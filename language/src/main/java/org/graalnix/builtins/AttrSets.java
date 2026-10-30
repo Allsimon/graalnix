@@ -72,7 +72,8 @@ final class AttrSets {
             TreeMap<String, List<Object>> m = new TreeMap<>();
             for (Object x : Types.list(a[1]).items) {
                 NixAttrs s = Types.attrs(x);
-                for (int i = 0; i < s.size(); i++) m.computeIfAbsent(s.keys[i], k -> new ArrayList<>()).add(s.values[i]);
+                for (int i = 0; i < s.size(); i++)
+                    m.computeIfAbsent(s.keys[i], k -> new ArrayList<>()).add(s.values[i]);
             }
             TreeMap<String, Object> out = new TreeMap<>();
             m.forEach((k, v) -> out.put(k, Thunk.apply(a[0], new NixString(k), new NixList(v.toArray()))));

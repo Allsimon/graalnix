@@ -10,7 +10,9 @@ import org.graalnix.runtime.NixString;
 
 /** String interpolation, or path interpolation when the first part is a path. */
 public final class InterpNode extends NixNode {
-    @Children private final NixNode[] parts;
+    @Children
+    private final NixNode[] parts;
+
     private final boolean isPath;
 
     public InterpNode(NixNode[] parts, boolean isPath) {
@@ -34,7 +36,8 @@ public final class InterpNode extends NixNode {
             ctx = NixString.merge(ctx, s.context);
         }
         if (isPath) {
-            if (ctx != null) throw new NixException("a string that refers to a store path cannot be appended to a path", this);
+            if (ctx != null)
+                throw new NixException("a string that refers to a store path cannot be appended to a path", this);
             return new NixPath(Coerce.canonicalize(sb.toString()));
         }
         return new NixString(sb.toString(), ctx);

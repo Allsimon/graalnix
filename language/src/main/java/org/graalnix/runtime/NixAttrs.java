@@ -10,6 +10,7 @@ public final class NixAttrs {
 
     /** Sorted by byte order, which is what {@code attrNames} and iteration expose. */
     public final String[] keys;
+
     public final Object[] values;
     /** Definition sites for {@code unsafeGetAttrPos}; null when unknown. */
     public final SourceSection[] positions;
@@ -22,7 +23,8 @@ public final class NixAttrs {
 
     public static NixAttrs of(Map<String, Object> map) {
         TreeMap<String, Object> sorted = map instanceof TreeMap<String, Object> t ? t : new TreeMap<>(map);
-        return new NixAttrs(sorted.keySet().toArray(new String[0]), sorted.values().toArray(), null);
+        return new NixAttrs(
+                sorted.keySet().toArray(new String[0]), sorted.values().toArray(), null);
     }
 
     public int size() {

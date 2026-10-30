@@ -5,8 +5,12 @@ import org.graalnix.runtime.NixException;
 import org.graalnix.runtime.Types;
 
 public final class AssertNode extends NixNode {
-    @Child private NixNode cond;
-    @Child private NixNode body;
+    @Child
+    private NixNode cond;
+
+    @Child
+    private NixNode body;
+
     private final String text;
 
     public AssertNode(NixNode cond, NixNode body, String text) {

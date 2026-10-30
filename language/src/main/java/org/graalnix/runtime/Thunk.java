@@ -55,9 +55,11 @@ public final class Thunk {
     }
 
     private String describeSource() {
-        if (target instanceof com.oracle.truffle.api.RootCallTarget rt && rt.getRootNode().getSourceSection() != null) {
+        if (target instanceof com.oracle.truffle.api.RootCallTarget rt
+                && rt.getRootNode().getSourceSection() != null) {
             var s = rt.getRootNode().getSourceSection();
-            return "\n       while evaluating " + rt.getRootNode().getName() + " at " + s.getSource().getName() + ":" + s.getStartLine() + ":" + s.getStartColumn();
+            return "\n       while evaluating " + rt.getRootNode().getName() + " at "
+                    + s.getSource().getName() + ":" + s.getStartLine() + ":" + s.getStartColumn();
         }
         return "";
     }

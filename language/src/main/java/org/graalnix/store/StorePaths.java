@@ -42,8 +42,10 @@ public final class StorePaths {
     /** Validates a store path name, mirroring {@code checkName}. */
     public static void checkName(String name) {
         if (name.isEmpty()) throw new IllegalArgumentException("name must not be empty");
-        if (name.length() > 211) throw new IllegalArgumentException("name '" + name + "' must be no longer than 211 characters");
-        if (name.charAt(0) == '.' && (name.equals(".") || name.equals("..") || name.startsWith(".-") || name.startsWith("..-"))) {
+        if (name.length() > 211)
+            throw new IllegalArgumentException("name '" + name + "' must be no longer than 211 characters");
+        if (name.charAt(0) == '.'
+                && (name.equals(".") || name.equals("..") || name.startsWith(".-") || name.startsWith("..-"))) {
             throw new IllegalArgumentException("name '" + name + "' is not valid");
         }
         for (int i = 0; i < name.length(); i++) {

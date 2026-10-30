@@ -5,11 +5,19 @@ import org.graalnix.runtime.Types;
 
 /** {@code &&}, {@code ||} and {@code ->}, which short-circuit on the left operand. */
 public final class LogicNode extends NixNode {
-    public enum Kind { AND, OR, IMPL }
+    public enum Kind {
+        AND,
+        OR,
+        IMPL
+    }
 
     private final Kind kind;
-    @Child private NixNode left;
-    @Child private NixNode right;
+
+    @Child
+    private NixNode left;
+
+    @Child
+    private NixNode right;
 
     public LogicNode(Kind kind, NixNode left, NixNode right) {
         this.kind = kind;

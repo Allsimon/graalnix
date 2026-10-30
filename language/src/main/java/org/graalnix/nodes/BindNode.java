@@ -6,9 +6,14 @@ import com.oracle.truffle.api.nodes.ExplodeLoop;
 
 /** Stores lazy values into frame slots before evaluating a body: {@code let}, {@code with} and hidden bindings. */
 public final class BindNode extends NixNode {
-    @CompilationFinal(dimensions = 1) private final int[] slots;
-    @Children private final NixNode[] values;
-    @Child private NixNode body;
+    @CompilationFinal(dimensions = 1)
+    private final int[] slots;
+
+    @Children
+    private final NixNode[] values;
+
+    @Child
+    private NixNode body;
 
     public BindNode(int[] slots, NixNode[] values, NixNode body) {
         this.slots = slots;

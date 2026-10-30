@@ -18,12 +18,13 @@ public final class Main {
 
     private static void usage() {
         System.err.println("""
-                usage: graalnix eval [--strict] [--json] [--raw] (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
-                       graalnix drv-path (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
+            usage: graalnix eval [--strict] [--json] [--raw] (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
+                   graalnix drv-path (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
 
-                options: -I PATH       add to the search path (like NIX_PATH)
-                         --system SYS  set builtins.currentSystem
-                         any --nix.* or Truffle tool option (e.g. --inspect, --cpusampler)""");
+            options: -I PATH       add to the search path (like NIX_PATH)
+                     --system SYS  set builtins.currentSystem
+                     any --nix.* or Truffle tool option (e.g. --inspect, --cpusampler)\
+            """);
         System.exit(2);
     }
 
@@ -109,7 +110,8 @@ public final class Main {
         } catch (PolyglotException e) {
             if (e.isInternalError()) {
                 e.printStackTrace();
-            } else if (e.getCause() instanceof StackOverflowError || e.getMessage() != null && e.getMessage().contains("StackOverflowError")) {
+            } else if (e.getCause() instanceof StackOverflowError
+                    || e.getMessage() != null && e.getMessage().contains("StackOverflowError")) {
                 System.err.println("error: stack overflow");
             } else {
                 System.err.println("error: " + e.getMessage());
@@ -117,7 +119,8 @@ public final class Main {
                     for (PolyglotException.StackFrame f : e.getPolyglotStackTrace()) {
                         if (!f.isGuestFrame() || f.getSourceLocation() == null) continue;
                         var loc = f.getSourceLocation();
-                        System.err.println("       at " + f.getRootName() + " " + loc.getSource().getName() + ":" + loc.getStartLine() + ":" + loc.getStartColumn());
+                        System.err.println("       at " + f.getRootName() + " "
+                                + loc.getSource().getName() + ":" + loc.getStartLine() + ":" + loc.getStartColumn());
                     }
                 }
             }

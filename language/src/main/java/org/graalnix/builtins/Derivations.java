@@ -38,6 +38,7 @@ public final class Derivations {
 
     /** Derivations produced so far, by .drv path; stands in for reading them back from the store. */
     private static final Map<String, Drv> DRVS = new HashMap<>();
+
     private static final Map<String, Map<String, byte[]>> HASH_MODULO = new HashMap<>();
 
     static void register(Builtins b) {
@@ -52,13 +53,14 @@ public final class Derivations {
             if (formatV == null) throw new NixException("attribute 'toHashFormat' missing");
             String[] h = parseAnyHash(Types.string(hashV).value, algoV == null ? null : Types.string(algoV).value);
             byte[] bytes = HexFormat.of().parseHex(h[1]);
-            return new NixString(switch (Types.string(formatV).value) {
-                case "base16" -> h[1];
-                case "nix32", "base32" -> NixBase32.encode(bytes);
-                case "base64" -> Base64.getEncoder().encodeToString(bytes);
-                case "sri" -> h[0] + "-" + Base64.getEncoder().encodeToString(bytes);
-                default -> throw new NixException("unknown hash format '" + Types.string(formatV).value + "'");
-            });
+            return new NixString(
+                    switch (Types.string(formatV).value) {
+                        case "base16" -> h[1];
+                        case "nix32", "base32" -> NixBase32.encode(bytes);
+                        case "base64" -> Base64.getEncoder().encodeToString(bytes);
+                        case "sri" -> h[0] + "-" + Base64.getEncoder().encodeToString(bytes);
+                        default -> throw new NixException("unknown hash format '" + Types.string(formatV).value + "'");
+                    });
         });
         b.values.put("derivation", new Thunk(() -> ctx.importFile(COREPKGS + "derivation.nix")));
     }
@@ -96,7 +98,8 @@ public final class Derivations {
             if (key.equals("__ignoreNulls")) continue;
             Object v = Thunk.force(attrs.values[i]);
             if (ignoreNulls && v == NixNull.INSTANCE) continue;
-            if (key.equals("__contentAddressed") && Types.bool(v)) throw error(drvName, "content-addressed derivations are not supported");
+            if (key.equals("__contentAddressed") && Types.bool(v))
+                throw error(drvName, "content-addressed derivations are not supported");
             if (key.equals("__impure") && Types.bool(v)) throw error(drvName, "impure derivations are not supported");
             if (key.equals("args")) {
                 for (Object x : Types.list(v).items) {
@@ -111,7 +114,9 @@ public final class Derivations {
                 NixString s = Json.toJson(v, true);
                 if (s.context != null) context.addAll(s.context);
                 if (json.length() > 1) json.append(',');
-                json.append(Json.toJson(new NixString(key), false).value).append(':').append(s.value);
+                json.append(Json.toJson(new NixString(key), false).value)
+                        .append(':')
+                        .append(s.value);
                 switch (key) {
                     case "builder" -> drv.builder = stringOf(v, context);
                     case "system" -> drv.platform = stringOf(v, context);
@@ -145,15 +150,19 @@ public final class Derivations {
                 addDeepClosure(c.substring(1), drv);
             } else if (c.startsWith("!")) {
                 int sep = c.indexOf('!', 1);
-                drv.inputDrvs.computeIfAbsent(c.substring(sep + 1), k -> new TreeSet<>()).add(c.substring(1, sep));
+                drv.inputDrvs
+                        .computeIfAbsent(c.substring(sep + 1), k -> new TreeSet<>())
+                        .add(c.substring(1, sep));
             } else {
                 drv.inputSrcs.add(c);
             }
         }
 
         if (outputHash != null) {
-            if (!outputs.equals(Set.of("out"))) throw error(drvName, "multiple outputs are not supported in fixed-output derivations");
-            String[] algoAndHash = parseAnyHash(outputHash, outputHashAlgo == null || outputHashAlgo.isEmpty() ? null : outputHashAlgo);
+            if (!outputs.equals(Set.of("out")))
+                throw error(drvName, "multiple outputs are not supported in fixed-output derivations");
+            String[] algoAndHash = parseAnyHash(
+                    outputHash, outputHashAlgo == null || outputHashAlgo.isEmpty() ? null : outputHashAlgo);
             String algo = algoAndHash[0];
             byte[] hash = HexFormat.of().parseHex(algoAndHash[1]);
             String method = outputHashMode == null ? "flat" : outputHashMode;
@@ -234,7 +243,8 @@ public final class Derivations {
             Map<String, byte[]> h = pathHashModulo(e.getKey());
             for (String o : e.getValue()) {
                 byte[] oh = h.get(o);
-                if (oh == null) throw new NixException("no hash for output '" + o + "' of derivation '" + e.getKey() + "'");
+                if (oh == null)
+                    throw new NixException("no hash for output '" + o + "' of derivation '" + e.getKey() + "'");
                 inputs.computeIfAbsent(Hashes.hex(oh), k -> new TreeSet<>()).add(o);
             }
         }
@@ -359,7 +369,9 @@ public final class Derivations {
             rest = s.substring(dash + 1);
             sri = true;
         }
-        if (algo == null) throw new NixException("hash '" + s + "' does not include a type, nor is the type otherwise known from context");
+        if (algo == null)
+            throw new NixException(
+                    "hash '" + s + "' does not include a type, nor is the type otherwise known from context");
         int size = Hashes.size(algo);
         byte[] bytes;
         try {
@@ -377,7 +389,8 @@ public final class Derivations {
         } catch (IllegalArgumentException e) {
             throw new NixException("hash '" + s + "' has wrong length for hash algorithm '" + algo + "'");
         }
-        if (bytes.length != size) throw new NixException("hash '" + s + "' has wrong length for hash algorithm '" + algo + "'");
+        if (bytes.length != size)
+            throw new NixException("hash '" + s + "' has wrong length for hash algorithm '" + algo + "'");
         return new String[] {algo, Hashes.hex(bytes)};
     }
 

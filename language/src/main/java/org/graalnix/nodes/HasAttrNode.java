@@ -6,8 +6,11 @@ import org.graalnix.runtime.NixAttrs;
 import org.graalnix.runtime.Thunk;
 
 public final class HasAttrNode extends NixNode {
-    @Child private NixNode target;
-    @Children private final AttrKey[] path;
+    @Child
+    private NixNode target;
+
+    @Children
+    private final AttrKey[] path;
 
     public HasAttrNode(NixNode target, AttrKey[] path) {
         this.target = target;

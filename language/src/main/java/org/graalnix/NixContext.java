@@ -29,6 +29,7 @@ public final class NixContext {
 
     /** UTF-8 bytes of {@code «string»}, the file name Nix reports for expressions given on the command line. */
     public static final String STRING_SOURCE = "\u00c2\u00abstring\u00c2\u00bb";
+
     public static final int MAX_CALL_DEPTH = 10000;
 
     public final NixLanguage language;
@@ -38,6 +39,7 @@ public final class NixContext {
     public final String system;
     /** Search path entries as {@code [prefix, path]}; the prefix is empty for unprefixed entries. */
     public final List<String[]> nixPath = new ArrayList<>();
+
     public final Map<String, Object> globals = new HashMap<>();
     private final Map<String, Thunk> imports = new HashMap<>();
     private final Map<String, String> copiedPaths = new HashMap<>();
@@ -54,7 +56,8 @@ public final class NixContext {
         for (String entry : np.split(":")) {
             if (entry.isEmpty()) continue;
             int eq = entry.indexOf('=');
-            nixPath.add(eq < 0 ? new String[] {"", entry} : new String[] {entry.substring(0, eq), entry.substring(eq + 1)});
+            nixPath.add(
+                    eq < 0 ? new String[] {"", entry} : new String[] {entry.substring(0, eq), entry.substring(eq + 1)});
         }
         Builtins.install(this);
     }
@@ -86,7 +89,8 @@ public final class NixContext {
             return Translator.translate(language, source, expr, fileName, baseDir, globals, scopeNames);
         } catch (ParseException e) {
             var sec = source.createSection(Math.min(e.offset, source.getLength()), 0);
-            throw new NixException(e.getMessage() + "\n       at " + fileName + ":" + sec.getStartLine() + ":" + sec.getStartColumn());
+            throw new NixException(
+                    e.getMessage() + "\n       at " + fileName + ":" + sec.getStartLine() + ":" + sec.getStartColumn());
         }
     }
 
@@ -140,7 +144,9 @@ public final class NixContext {
     }
 
     public static String describe(IOException e) {
-        return e instanceof java.nio.file.NoSuchFileException ? "No such file or directory" : String.valueOf(e.getMessage());
+        return e instanceof java.nio.file.NoSuchFileException
+                ? "No such file or directory"
+                : String.valueOf(e.getMessage());
     }
 
     /** Computes the store path {@code path} would be copied to, without copying it. */

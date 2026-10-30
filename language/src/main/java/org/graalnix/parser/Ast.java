@@ -9,8 +9,27 @@ public final class Ast {
 
     public record Pos(int start, int end) {}
 
-    public sealed interface Expr permits IntLit, FloatLit, StrLit, PathLit, Interp, SearchPath, Var, Select, HasAttr,
-            Attrs, ListExpr, Lambda, Call, Let, With, Assert, If, BinOp, Not, CurPos {
+    public sealed interface Expr
+            permits IntLit,
+                    FloatLit,
+                    StrLit,
+                    PathLit,
+                    Interp,
+                    SearchPath,
+                    Var,
+                    Select,
+                    HasAttr,
+                    Attrs,
+                    ListExpr,
+                    Lambda,
+                    Call,
+                    Let,
+                    With,
+                    Assert,
+                    If,
+                    BinOp,
+                    Not,
+                    CurPos {
         Pos pos();
     }
 
@@ -42,7 +61,11 @@ public final class Ast {
 
     public record HasAttr(Pos pos, Expr target, List<AttrName> path) implements Expr {}
 
-    public enum AttrKind { PLAIN, INHERITED, INHERITED_FROM }
+    public enum AttrKind {
+        PLAIN,
+        INHERITED,
+        INHERITED_FROM
+    }
 
     /** The expression of an {@code inherit (from)} clause, shared by all attributes it introduces. */
     public static final class InheritSource {
@@ -94,7 +117,23 @@ public final class Ast {
 
     public record If(Pos pos, Expr cond, Expr then, Expr otherwise) implements Expr {}
 
-    public enum Op { EQ, NEQ, AND, OR, IMPL, UPDATE, CONCAT, ADD, SUB, MUL, DIV, LT, LE, GT, GE }
+    public enum Op {
+        EQ,
+        NEQ,
+        AND,
+        OR,
+        IMPL,
+        UPDATE,
+        CONCAT,
+        ADD,
+        SUB,
+        MUL,
+        DIV,
+        LT,
+        LE,
+        GT,
+        GE
+    }
 
     public record BinOp(Pos pos, Op op, Expr left, Expr right) implements Expr {}
 

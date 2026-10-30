@@ -6,7 +6,9 @@ import org.graalnix.runtime.Types;
 /** One element of an attribute path: a static name, or a dynamic expression when {@code name} is null. */
 public final class AttrKey extends NixNode {
     private final String name;
-    @Child private NixNode dynamic;
+
+    @Child
+    private NixNode dynamic;
 
     public AttrKey(String name, NixNode dynamic) {
         this.name = name;

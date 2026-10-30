@@ -44,9 +44,11 @@ final class EvalRootNode extends RootNode {
         String content = source.getCharacters().toString();
         Object v;
         if (name.startsWith("/")) {
-            v = Thunk.force(ctx.parse(content, name, NixContext.parentDir(name), new String[0]).call((Object) null));
+            v = Thunk.force(ctx.parse(content, name, NixContext.parentDir(name), new String[0])
+                    .call((Object) null));
         } else {
-            v = Thunk.force(ctx.parse(content, NixContext.STRING_SOURCE, System.getProperty("user.dir"), new String[0]).call((Object) null));
+            v = Thunk.force(ctx.parse(content, NixContext.STRING_SOURCE, System.getProperty("user.dir"), new String[0])
+                    .call((Object) null));
         }
         Map<String, Object> args = autoArgs(ctx, options.get(NixLanguage.Args));
         v = autoCall(v, args);
@@ -57,7 +59,9 @@ final class EvalRootNode extends RootNode {
                 v = l.get(i);
             } else {
                 Object r = Types.attrs(v).get(key);
-                if (r == null) throw new NixException("attribute '" + key + "' in selection path '" + options.get(NixLanguage.Attr) + "' not found");
+                if (r == null)
+                    throw new NixException("attribute '" + key + "' in selection path '" + options.get(NixLanguage.Attr)
+                            + "' not found");
                 v = r;
             }
             v = autoCall(v, args);
@@ -89,7 +93,11 @@ final class EvalRootNode extends RootNode {
             if (f[0].equals("str")) {
                 args.put(f[1], new NixString(f[2]));
             } else {
-                args.put(f[1], Thunk.force(ctx.parse(f[2], NixContext.STRING_SOURCE, System.getProperty("user.dir"), new String[0]).call((Object) null)));
+                args.put(
+                        f[1],
+                        Thunk.force(
+                                ctx.parse(f[2], NixContext.STRING_SOURCE, System.getProperty("user.dir"), new String[0])
+                                        .call((Object) null)));
             }
         }
         return args;

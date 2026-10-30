@@ -5,7 +5,8 @@ import com.oracle.truffle.api.nodes.ExplodeLoop;
 import org.graalnix.runtime.NixList;
 
 public final class ListNode extends NixNode {
-    @Children private final NixNode[] items;
+    @Children
+    private final NixNode[] items;
 
     public ListNode(NixNode[] items) {
         this.items = items;
