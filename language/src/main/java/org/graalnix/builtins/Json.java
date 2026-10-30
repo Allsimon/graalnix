@@ -99,8 +99,12 @@ public final class Json {
 
     private void string(String s) {
         out.append('"');
+        int start = 0;
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
+            if (c >= 0x20 && c != '"' && c != '\\') continue;
+            out.append(s, start, i);
+            start = i + 1;
             switch (c) {
                 case '"' -> out.append("\\\"");
                 case '\\' -> out.append("\\\\");
@@ -109,16 +113,10 @@ public final class Json {
                 case '\n' -> out.append("\\n");
                 case '\r' -> out.append("\\r");
                 case '\t' -> out.append("\\t");
-                default -> {
-                    if (c < 0x20) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-                }
+                default -> out.append(String.format("\\u%04x", (int) c));
             }
         }
-        out.append('"');
+        out.append(s, start, s.length()).append('"');
     }
 
     /** nlohmann::json's shortest round-trip formatting. */
