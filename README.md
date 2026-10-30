@@ -18,17 +18,21 @@ nix build .#graalnix          # static native binary (musl)
 engine; for example, `--inspect` opens the Chrome DevTools debugger and
 `--cpusampler` profiles an evaluation.
 
-To develop:
+The build uses [Jenesis](https://jenesis.build), vendored in `build/jenesis`.
+Each module's `module-info.java` declares its build, and the tool settings live
+in `META-INF/build.jenesis/` next to the module's sources. To develop:
 
 ```sh
 nix develop
-gradle :language:test              # upstream lang tests + tests/graalnix
-gradle :launcher:installDist       # JVM launcher in launcher/build/install/graalnix
-gradle :launcher:nativeCompile     # native launcher in launcher/build/native/nativeCompile
+java build/jenesis/Make.java                    # compile and run the tests (upstream lang + tests/graalnix)
+java build/jenesis/Execute.java eval -E '1 + 1'  # run the launcher on the JVM
+java -Djenesis.make.profiles=native build/jenesis/Make.java stage
+                                                # native launcher in target/stage/native/output
 ```
 
-After changing Gradle dependencies, refresh `nix/deps.json` with
-`nix build .#graalnix.mitmCache.updateScript && ./result`.
+After changing a dependency, run `java build/jenesis/Make.java pin`. Then
+update `outputHash` of `deps` in `nix/package.nix`; `nix build .#graalnix.deps`
+prints the new hash.
 
 ## Status
 

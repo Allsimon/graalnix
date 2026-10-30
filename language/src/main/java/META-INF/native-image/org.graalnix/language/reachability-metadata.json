@@ -1,0 +1,5 @@
+{
+  "resources": [
+    { "module": "org.graalnix", "glob": "org/graalnix/corepkgs/*" }
+  ]
+}

@@ -1,0 +1,143 @@
+package org.graalnix.test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Stream;
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Source;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.TestFactory;
+
+/** Runs NixOS/nix's tests/functional/lang suite the way lang.sh does, plus graalnix's own tests in tests/graalnix. */
+class LangTest {
+    private static final Path TESTS = Path.of(System.getProperty("graalnix.tests", "tests")).toAbsolutePath().normalize();
+    private static final Path LANG = TESTS.resolve("lang");
+    private static final Path OWN = TESTS.resolve("graalnix");
+    private static final Engine ENGINE = Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build();
+
+    /** Tests known to fail, with the reason; keep this list short and shrinking. */
+    private static final Set<String> SKIP = skipList();
+
+    private static Set<String> skipList() {
+        try {
+            return Set.copyOf(Files.readAllLines(TESTS.resolve("lang-skip.txt")).stream()
+                    .map(l -> l.replaceAll("#.*", "").trim()).filter(l -> !l.isEmpty()).toList());
+        } catch (IOException e) {
+            return Set.of();
+        }
+    }
+
+    @AfterAll
+    static void close() {
+        ENGINE.close();
+    }
+
+    private static String latin1(Path p) throws IOException {
+        return new String(Files.readAllBytes(p), StandardCharsets.ISO_8859_1);
+    }
+
+    private static List<Path> tests(String prefix) throws IOException {
+        List<Path> out = new ArrayList<>();
+        for (Path dir : List.of(LANG, OWN)) {
+            try (Stream<Path> s = Files.list(dir)) {
+                s.filter(p -> p.getFileName().toString().startsWith(prefix) && p.toString().endsWith(".nix")).sorted().forEach(out::add);
+            }
+        }
+        return out;
+    }
+
+    private static Path sibling(Path test, String suffix) {
+        return test.resolveSibling(name(test) + suffix);
+    }
+
+    private static String name(Path p) {
+        String f = p.getFileName().toString();
+        return f.substring(0, f.length() - 4);
+    }
+
+    private static String eval(Path file, List<String> flags) throws IOException {
+        Context.Builder b = Context.newBuilder("nix").engine(ENGINE).allowAllAccess(true).option("nix.Output", "strict");
+        List<String> searchPath = new ArrayList<>();
+        List<String> args = new ArrayList<>();
+        for (int i = 0; i < flags.size(); i++) {
+            switch (flags.get(i)) {
+                case "-I" -> searchPath.add(absolutise(flags.get(++i)));
+                case "-A" -> b.option("nix.Attr", flags.get(++i));
+                case "--arg" -> args.add("expr\u0002" + flags.get(++i) + "\u0002" + flags.get(++i).replace("lang/", LANG + "/"));
+                case "--argstr" -> args.add("str\u0002" + flags.get(++i) + "\u0002" + flags.get(++i));
+                default -> {}
+            }
+        }
+        searchPath.add(LANG + "/dir3");
+        searchPath.add(LANG + "/dir4");
+        b.option("nix.NixPath", String.join(":", searchPath));
+        b.option("nix.Args", String.join("\u0001", args));
+        try (Context ctx = b.build()) {
+            Source src = Source.newBuilder("nix", latin1(file), file.toString()).build();
+            return ctx.eval(src).asString().replace(TESTS.toString(), "/pwd");
+        }
+    }
+
+    private static String absolutise(String entry) {
+        int eq = entry.indexOf('=');
+        return eq < 0 ? TESTS.resolve(entry).toString() : entry.substring(0, eq + 1) + TESTS.resolve(entry.substring(eq + 1));
+    }
+
+    private static List<String> flags(Path test) throws IOException {
+        Path f = sibling(test, ".flags");
+        if (!Files.exists(f)) return List.of();
+        return List.of(Files.readString(f).replaceAll("#.*", "").trim().split("\\s+"));
+    }
+
+    private static DynamicTest test(Path p, org.junit.jupiter.api.function.Executable body) {
+        String n = name(p);
+        return DynamicTest.dynamicTest(n, () -> {
+            if (SKIP.contains(n)) return;
+            body.execute();
+        });
+    }
+
+    @TestFactory
+    Stream<DynamicTest> evalOkay() throws IOException {
+        return tests("eval-okay-").stream()
+                .filter(p -> !Files.exists(sibling(p, ".exp.xml")) && !Files.exists(sibling(p, ".exp-disabled")))
+                .map(p -> test(p, () -> {
+                    String expected = latin1(sibling(p, ".exp")).stripTrailing();
+                    assertThat(eval(p, flags(p))).isEqualTo(expected);
+                }));
+    }
+
+    @TestFactory
+    Stream<DynamicTest> evalFail() throws IOException {
+        return tests("eval-fail-").stream().map(p -> test(p, () ->
+                assertThatThrownBy(() -> eval(p, flags(p))).isInstanceOf(PolyglotException.class)
+                        .matches(e -> !((PolyglotException) e).isInternalError(), "is not an internal error")));
+    }
+
+    private static void parse(Path p) throws IOException {
+        org.graalnix.parser.Parser.parse(latin1(p));
+    }
+
+    @TestFactory
+    Stream<DynamicTest> parseOkay() throws IOException {
+        return tests("parse-okay-").stream().map(p -> test(p, () -> parse(p)));
+    }
+
+    @TestFactory
+    Stream<DynamicTest> parseFail() throws IOException {
+        return tests("parse-fail-").stream().map(p -> test(p, () ->
+                assertThatThrownBy(() -> eval(p, List.of())).isInstanceOf(PolyglotException.class)
+                        .matches(e -> !((PolyglotException) e).isInternalError(), "is not an internal error")));
+    }
+}

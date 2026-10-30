@@ -22,7 +22,6 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.graalvmPackages.graalvm-ce-musl
-            pkgs.gradle_9
           ];
           JAVA_HOME = pkgs.graalvmPackages.graalvm-ce-musl;
         };
