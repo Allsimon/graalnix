@@ -15,6 +15,7 @@ public abstract sealed class NixNode extends Node
                 ForceNode,
                 HasAttrNode,
                 IfNode,
+                InPlaceThunkNode,
                 InterpNode,
                 LambdaBodyNode,
                 LambdaNode,
