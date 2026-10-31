@@ -27,6 +27,8 @@ let
     ../language/src/test
     ../format/src/main
     ../format/src/test
+    ../lint/src/main
+    ../lint/src/test
   ];
 
   # Every artifact is pinned by checksum in the module-info.java files, so this download is reproducible.

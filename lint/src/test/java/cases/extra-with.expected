@@ -1,0 +1,2 @@
+extra-with.nix:3:12: warning[extra-with]: unused 'with': no variable comes from it [fix]
+extra-with.nix:7:17: warning[extra-with]: unused 'with': no variable comes from it [fix]

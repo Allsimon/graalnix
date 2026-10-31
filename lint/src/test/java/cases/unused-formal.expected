@@ -1,0 +1,4 @@
+unused-formal.nix:2:9: warning[unused-formal]: unused formal argument 'b' [fix]
+unused-formal.nix:4:9: warning[unused-formal]: unused formal argument 'b'
+unused-formal.nix:10:7: warning[unused-formal]: unused formal argument 'a' [fix]
+unused-formal.nix:11:7: warning[unused-formal]: unused formal argument 'b' [fix]

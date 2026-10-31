@@ -1,0 +1,8 @@
+unused-let-binding.nix:4:3: warning[unused-let-binding]: unused let binding 'unused' [fix]
+unused-let-binding.nix:5:3: warning[unused-let-binding]: unused let binding 'self' [fix]
+unused-let-binding.nix:6:3: warning[unused-let-binding]: unused let binding 'a' [fix]
+unused-let-binding.nix:7:3: warning[unused-let-binding]: unused let binding 'b' [fix]
+unused-let-binding.nix:9:20: warning[unused-let-binding]: unused let binding 'dropped' [fix]
+unused-let-binding.nix:10:15: warning[unused-let-binding]: unused let binding 'gone' [fix]
+unused-let-binding.nix:11:3: warning[unused-let-binding]: unused let binding 'nested' [fix]
+unused-let-binding.nix:14:3: warning[unused-let-binding]: unused let binding 'dead' [fix]

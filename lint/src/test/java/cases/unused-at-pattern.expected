@@ -1,0 +1,2 @@
+unused-at-pattern.nix:2:4: warning[unused-at-pattern]: unused pattern binding 'args' [fix]
+unused-at-pattern.nix:3:17: warning[unused-at-pattern]: unused pattern binding 'args' [fix]

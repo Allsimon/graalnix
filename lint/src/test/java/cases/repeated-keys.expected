@@ -1,0 +1,1 @@
+repeated-keys.nix:2:3: hint[repeated-keys]: 'a' is set 3 times; group its attributes in one attribute set

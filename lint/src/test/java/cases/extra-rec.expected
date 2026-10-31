@@ -1,0 +1,1 @@
+extra-rec.nix:2:11: warning[extra-rec]: 'rec' is not needed: no attribute refers to another [fix]

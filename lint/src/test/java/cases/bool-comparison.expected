@@ -1,0 +1,2 @@
+bool-comparison.nix:3:4: warning[bool-comparison]: comparison with 'true'; if the other side is always a boolean, use it directly
+bool-comparison.nix:4:4: warning[bool-comparison]: comparison with 'false'; if the other side is always a boolean, use it directly
