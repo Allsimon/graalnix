@@ -14,3 +14,18 @@ directories:
         excludePaths:
           - tests/functional/lang/symlink-resolution/broken
         newRootPath: tests/functional/lang
+  - path: language/src/test/java/tvix
+    contents:
+      - path: .
+        git:
+          url: https://github.com/tvlfyi/tvix
+          ref: 259a1617ef482482d3425d74502822ac58c4d024
+          depth: 1
+        includePaths:
+          - eval/src/tests/tvix_tests/**/*
+        # identity-* tests expect their own source back, which the harness does not check.
+        excludePaths:
+          - eval/src/tests/tvix_tests/notyetpassing/**/*
+          - eval/src/tests/tvix_tests/identity-*
+          - eval/src/tests/tvix_tests/README.md
+        newRootPath: eval/src/tests/tvix_tests
