@@ -73,7 +73,13 @@ public enum Rule {
             "A binding that hides a global such as `map`, `true` or `builtins`. Attributes of a `rec` set and names"
                     + " inherited from an expression are not reported."),
     EXTRA_REC(WARNING, "A `rec` attribute set whose attributes never refer to each other."),
-    EXTRA_WITH(WARNING, "A `with` that no variable can come from.");
+    EXTRA_WITH(WARNING, "A `with` that no variable can come from."),
+
+    MISSING_PHASE_HOOKS(
+            WARNING,
+            "A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects"
+                    + " `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and"
+                    + " `postInstall` still work. The fix adds the missing calls to strings of several lines.");
 
     private final Severity severity;
     private final String description;

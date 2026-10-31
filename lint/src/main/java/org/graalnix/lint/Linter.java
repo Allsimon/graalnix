@@ -40,6 +40,7 @@ public final class Linter {
         DeadCode.check(src, scope, out);
         Patterns.check(src, scope, out);
         Semantics.check(src, scope, out);
+        Packaging.check(src, scope, out);
         return out.stream()
                 .filter(d -> rules.contains(d.rule()))
                 .sorted(Comparator.comparingInt(Diagnostic::start).thenComparing(Diagnostic::rule))
