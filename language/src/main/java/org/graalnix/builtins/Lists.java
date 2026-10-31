@@ -31,6 +31,8 @@ final class Lists {
         });
         b.add("map", 2, a -> {
             NixList l = Types.list(a[1]);
+            if (l.size() == 0) return l;
+            Types.callable(a[0]);
             Object[] out = new Object[l.size()];
             for (int i = 0; i < out.length; i++) out[i] = Thunk.apply(a[0], l.items[i]);
             return new NixList(out);
@@ -49,6 +51,7 @@ final class Lists {
         b.add("genList", 2, a -> {
             long n = Types.integer(a[1]);
             if (n < 0) throw new NixException("cannot create list of size " + n);
+            Types.callable(a[0]);
             Object[] out = new Object[(int) n];
             for (int i = 0; i < n; i++) out[i] = Thunk.apply(a[0], (long) i);
             return new NixList(out);
@@ -76,7 +79,11 @@ final class Lists {
             return false;
         });
         b.add("sort", 2, a -> {
-            Object[] items = Types.list(a[1]).items.clone();
+            NixList l = Types.list(a[1]);
+            if (l.size() == 0) return l;
+            Types.callable(a[0]);
+            Object[] items = l.items.clone();
+            for (int i = 0; i < items.length; i++) items[i] = Thunk.force(items[i]);
             mergeSort(items, (x, y) -> Types.bool(Apply.apply(Apply.apply(a[0], x), y)));
             return new NixList(items);
         });
