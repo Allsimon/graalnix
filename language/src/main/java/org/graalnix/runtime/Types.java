@@ -84,6 +84,13 @@ public final class Types {
         throw expected("a string", v);
     }
 
+    /** Nix's {@code forceFunction}: a function, or a set with {@code __functor}. */
+    public static Object callable(Object v) {
+        v = Thunk.force(v);
+        if (v instanceof NixAttrs a && a.has("__functor")) return v;
+        return function(v);
+    }
+
     public static Object function(Object v) {
         v = Thunk.force(v);
         if (v instanceof NixLambda || v instanceof PrimOp || v instanceof PrimOp.Partial) return v;

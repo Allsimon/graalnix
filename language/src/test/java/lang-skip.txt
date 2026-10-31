@@ -33,9 +33,6 @@ tvix/eval-okay-builtins-replace-strings-propagate-catchable
 tvix/eval-okay-toxml-empty
 tvix/eval-okay-xml
 
-# map, genList and sort do not force their function argument
-tvix/eval-okay-builtins-sort-propagate-catchable
-
 # == and list comparison do not follow Nix's value pointer equality
 tvix/eval-okay-observable-eval-cache
 tvix/eval-okay-value-pointer-compare
