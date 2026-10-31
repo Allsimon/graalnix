@@ -1,0 +1,1 @@
+# nixfmt tests known to fail, one name per line, with the reason in a comment.

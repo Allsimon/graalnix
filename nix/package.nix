@@ -23,7 +23,11 @@ let
       );
     };
   src = sources [ ];
-  testSrc = sources [ ../language/src/test ];
+  testSrc = sources [
+    ../language/src/test
+    ../format/src/main
+    ../format/src/test
+  ];
 
   # Every artifact is pinned by checksum in the module-info.java files, so this download is reproducible.
   deps = stdenv.mkDerivation {

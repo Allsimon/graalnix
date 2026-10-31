@@ -3,10 +3,9 @@ package org.graalnix.parser;
 import static org.graalnix.parser.TokenType.*;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import org.graalnix.parser.Ast.*;
+import org.graalnix.parser.Ast.Pos;
+import org.graalnix.parser.Syntax.*;
 
 /** Recursive-descent port of Nix's grammar (src/libexpr/parser.y). */
 public final class Parser {
@@ -19,9 +18,13 @@ public final class Parser {
         this.cur = lexer.next();
     }
 
-    public static Expr parse(String src) {
+    public static Ast.Expr parse(String src) {
+        return Lower.lower(parseSyntax(src));
+    }
+
+    public static Node parseSyntax(String src) {
         Parser p = new Parser(src);
-        Expr e = p.parseExpr();
+        Node e = p.parseExpr();
         if (p.cur.type() != EOF) throw p.unexpected();
         return e;
     }
@@ -36,10 +39,8 @@ public final class Parser {
         return cur.type() == t;
     }
 
-    private boolean accept(TokenType t) {
-        if (cur.type() != t) return false;
-        advance();
-        return true;
+    private Token accept(TokenType t) {
+        return cur.type() == t ? advance() : null;
     }
 
     private Token expect(TokenType t) {
@@ -70,56 +71,47 @@ public final class Parser {
         }
     }
 
-    private Expr parseExpr() {
+    private Node parseExpr() {
         int start = cur.start();
         switch (cur.type()) {
             case ID -> {
                 TokenType next = peek(1);
                 if (next == COLON) {
-                    String arg = advance().text();
-                    advance();
-                    Expr body = parseExpr();
-                    return new Lambda(from(start), arg, null, body);
+                    Token arg = advance();
+                    Token colon = advance();
+                    Node body = parseExpr();
+                    return new Lambda(from(start), arg, null, null, colon, body);
                 }
                 if (next == AT) {
-                    String arg = advance().text();
-                    advance();
-                    expect(LBRACE);
-                    return parseFormalsLambda(start, arg);
+                    Token arg = advance();
+                    Token at = advance();
+                    return parseFormalsLambda(start, arg, at);
                 }
             }
             case LBRACE -> {
-                if (isFormals()) {
-                    advance();
-                    return parseFormalsLambda(start, null);
-                }
+                if (isFormals()) return parseFormalsLambda(start, null, null);
             }
             case ASSERT -> {
-                advance();
-                Expr cond = parseExpr();
-                expect(SEMI);
-                Expr body = parseExpr();
-                return new Assert(from(start), cond, body);
+                Token kw = advance();
+                Node cond = parseExpr();
+                Token semi = expect(SEMI);
+                Node body = parseExpr();
+                return new Assert(from(start), kw, cond, semi, body);
             }
             case WITH -> {
-                advance();
-                Expr scope = parseExpr();
-                expect(SEMI);
-                Expr body = parseExpr();
-                return new With(from(start), scope, body);
+                Token kw = advance();
+                Node scope = parseExpr();
+                Token semi = expect(SEMI);
+                Node body = parseExpr();
+                return new With(from(start), kw, scope, semi, body);
             }
             case LET -> {
                 if (peek(1) != LBRACE) {
-                    advance();
-                    Attrs binds = new Attrs(new Pos(start, start), true);
-                    parseBinds(binds, IN);
-                    expect(IN);
-                    for (DynAttr d : binds.dynamic) {
-                        throw new ParseException(
-                                "dynamic attributes not allowed in let", d.pos().start());
-                    }
-                    Expr body = parseExpr();
-                    return new Let(from(start), binds, body);
+                    Token kw = advance();
+                    List<Binding> binds = parseBinds(IN);
+                    Token in = expect(IN);
+                    Node body = parseExpr();
+                    return new Let(from(start), kw, binds, in, body);
                 }
             }
             default -> {}
@@ -145,114 +137,93 @@ public final class Parser {
         return false;
     }
 
-    /** Parses formals after the opening brace, then the optional {@code @name}, the colon and the body. */
-    private Expr parseFormalsLambda(int start, String arg) {
+    /** Parses the formals from the opening brace, then the optional {@code @name}, the colon and the body. */
+    private Node parseFormalsLambda(int start, Token arg, Token at) {
+        Token open = expect(LBRACE);
         List<Formal> formals = new ArrayList<>();
-        Set<String> names = new HashSet<>();
-        boolean ellipsis = false;
+        Token ellipsis = null;
         while (!at(RBRACE)) {
-            if (accept(ELLIPSIS)) {
-                ellipsis = true;
-                break;
-            }
+            if ((ellipsis = accept(ELLIPSIS)) != null) break;
             Token name = expect(ID);
-            Expr fallback = accept(QUESTION) ? parseExpr() : null;
-            if (!names.add(name.text())) {
-                throw new ParseException("duplicate formal function argument '" + name.text() + "'", name.start());
-            }
-            formals.add(new Formal(new Pos(name.start(), prev.end()), name.text(), fallback));
-            if (!accept(COMMA)) break;
+            Token question = accept(QUESTION);
+            Node fallback = question != null ? parseExpr() : null;
+            Pos pos = new Pos(name.start(), prev.end());
+            Token comma = accept(COMMA);
+            formals.add(new Formal(pos, name, question, fallback, comma));
+            if (comma == null) break;
         }
-        expect(RBRACE);
-        if (arg == null && accept(AT)) arg = expect(ID).text();
-        if (arg != null && names.contains(arg)) {
-            throw new ParseException("duplicate formal function argument '" + arg + "'", start);
-        }
-        expect(COLON);
-        Expr body = parseExpr();
-        return new Lambda(from(start), arg, new Formals(formals, ellipsis), body);
+        Token close = expect(RBRACE);
+        if (arg == null && (at = accept(AT)) != null) arg = expect(ID);
+        Token colon = expect(COLON);
+        Node body = parseExpr();
+        return new Lambda(from(start), arg, at, new Formals(open, formals, ellipsis, close), colon, body);
     }
 
-    private Expr parseIf() {
+    private Node parseIf() {
         if (at(IF)) {
             int start = cur.start();
-            advance();
-            Expr cond = parseExpr();
-            expect(THEN);
-            Expr then = parseExpr();
-            expect(ELSE);
-            Expr otherwise = parseExpr();
-            return new If(from(start), cond, then, otherwise);
+            Token if_ = advance();
+            Node cond = parseExpr();
+            Token then_ = expect(THEN);
+            Node then = parseExpr();
+            Token else_ = expect(ELSE);
+            Node otherwise = parseExpr();
+            return new If(from(start), if_, cond, then_, then, else_, otherwise);
         }
         return parseBinary(1);
     }
 
-    private static final int PREC_NOT = 7;
-    private static final int PREC_NEGATE = 12;
+    private static final int PREC_NOT = 9;
+    private static final int PREC_NEGATE = 14;
 
     private static int infixPrec(TokenType t) {
         return switch (t) {
-            case IMPL -> 1;
-            case OR -> 2;
-            case AND -> 3;
-            case EQ, NEQ -> 4;
-            case LT, GT, LEQ, GEQ -> 5;
-            case UPDATE -> 6;
-            case PLUS, MINUS -> 8;
-            case STAR, SLASH -> 9;
-            case CONCAT -> 10;
-            case QUESTION -> 11;
+            case PIPE_FROM -> 1;
+            case PIPE_INTO -> 2;
+            case IMPL -> 3;
+            case OR -> 4;
+            case AND -> 5;
+            case EQ, NEQ -> 6;
+            case LT, GT, LEQ, GEQ -> 7;
+            case UPDATE -> 8;
+            case PLUS, MINUS -> 10;
+            case STAR, SLASH -> 11;
+            case CONCAT -> 12;
+            case QUESTION -> 13;
             default -> -1;
         };
     }
 
-    private Expr parseBinary(int minPrec) {
+    private Node parseBinary(int minPrec) {
         int start = cur.start();
-        Expr left = parseUnary();
+        Node left = parseUnary();
         while (true) {
             TokenType t = cur.type();
             int prec = infixPrec(t);
             if (prec < minPrec || prec < 0) return left;
-            advance();
+            Token op = advance();
             if (t == QUESTION) {
-                left = new HasAttr(from(start), left, parseAttrPath());
+                Pos pos = from(start);
+                left = new HasAttr(pos, left, op, parseAttrPath());
                 continue;
             }
-            boolean rightAssoc = t == IMPL || t == UPDATE || t == CONCAT;
-            Expr right = parseBinary(rightAssoc ? prec : prec + 1);
-            Pos pos = from(start);
-            left = switch (t) {
-                case IMPL -> new BinOp(pos, Op.IMPL, left, right);
-                case OR -> new BinOp(pos, Op.OR, left, right);
-                case AND -> new BinOp(pos, Op.AND, left, right);
-                case EQ -> new BinOp(pos, Op.EQ, left, right);
-                case NEQ -> new BinOp(pos, Op.NEQ, left, right);
-                case LT -> new BinOp(pos, Op.LT, left, right);
-                case GT -> new BinOp(pos, Op.GT, left, right);
-                case LEQ -> new BinOp(pos, Op.LE, left, right);
-                case GEQ -> new BinOp(pos, Op.GE, left, right);
-                case UPDATE -> new BinOp(pos, Op.UPDATE, left, right);
-                case PLUS -> new BinOp(pos, Op.ADD, left, right);
-                case MINUS -> new BinOp(pos, Op.SUB, left, right);
-                case STAR -> new BinOp(pos, Op.MUL, left, right);
-                case SLASH -> new BinOp(pos, Op.DIV, left, right);
-                case CONCAT -> new BinOp(pos, Op.CONCAT, left, right);
-                default -> throw new IllegalStateException();
-            };
-            if ((prec == 4 || prec == 5) && infixPrec(cur.type()) == prec) throw unexpected();
+            boolean rightAssoc = t == PIPE_FROM || t == IMPL || t == UPDATE || t == CONCAT;
+            Node right = parseBinary(rightAssoc ? prec : prec + 1);
+            left = new BinOp(from(start), left, op, right);
+            if ((prec == 6 || prec == 7) && infixPrec(cur.type()) == prec) throw unexpected();
         }
     }
 
-    private Expr parseUnary() {
+    private Node parseUnary() {
         int start = cur.start();
-        if (accept(NOT)) {
-            Expr operand = parseBinary(PREC_NOT + 1);
-            return new Not(from(start), operand);
+        Token op;
+        if ((op = accept(NOT)) != null) {
+            Node operand = parseBinary(PREC_NOT + 1);
+            return new Not(from(start), op, operand);
         }
-        if (accept(MINUS)) {
-            Expr operand = parseBinary(PREC_NEGATE + 1);
-            Pos pos = from(start);
-            return new BinOp(pos, Op.SUB, new IntLit(pos, 0), operand);
+        if ((op = accept(MINUS)) != null) {
+            Node operand = parseBinary(PREC_NEGATE + 1);
+            return new Negate(from(start), op, operand);
         }
         return parseApp();
     }
@@ -265,49 +236,49 @@ public final class Parser {
         };
     }
 
-    private Expr parseApp() {
+    private Node parseApp() {
         int start = cur.start();
-        Expr fn = parseSelect();
+        Node fn = parseSelect();
         if (!startsSimple()) return fn;
-        List<Expr> args = new ArrayList<>();
+        List<Node> args = new ArrayList<>();
         while (startsSimple()) args.add(parseSelect());
         return new Call(from(start), fn, args);
     }
 
-    private Expr parseSelect() {
+    private Node parseSelect() {
         int start = cur.start();
-        Expr e = parseSimple();
-        if (accept(DOT)) {
-            List<AttrName> path = parseAttrPath();
-            Expr fallback = accept(OR_KW) ? parseSelect() : null;
-            return new Select(from(start), e, path, fallback);
+        Node e = parseSimple();
+        Token dot = accept(DOT);
+        if (dot != null) {
+            List<Sel> path = new ArrayList<>();
+            path.add(new Sel(dot, parseAttr()));
+            while ((dot = accept(DOT)) != null) path.add(new Sel(dot, parseAttr()));
+            Token or = accept(OR_KW);
+            Node fallback = or != null ? parseSelect() : null;
+            return new Select(from(start), e, path, or, fallback);
         }
         if (at(OR_KW)) {
             Token or = advance();
-            return new Call(from(start), e, List.of(new Var(new Pos(or.start(), or.end()), "or")));
+            return new Call(from(start), e, List.of(new Ident(new Pos(or.start(), or.end()), or)));
         }
         return e;
     }
 
-    private Expr parseSimple() {
+    private Node parseSimple() {
         int start = cur.start();
         Token t = cur;
         switch (t.type()) {
             case ID -> {
                 advance();
-                return t.text().equals("__curPos") ? new CurPos(from(start)) : new Var(from(start), t.text());
+                return new Ident(from(start), t);
             }
             case INT -> {
                 advance();
-                try {
-                    return new IntLit(from(start), Long.parseLong(t.text()));
-                } catch (NumberFormatException e) {
-                    throw new ParseException("invalid integer '" + t.text() + "'", start);
-                }
+                return new IntLit(from(start), t);
             }
             case FLOAT -> {
                 advance();
-                return new FloatLit(from(start), Double.parseDouble(t.text()));
+                return new FloatLit(from(start), t);
             }
             case STR_OPEN -> {
                 return parseString(start);
@@ -320,195 +291,99 @@ public final class Parser {
             }
             case SPATH -> {
                 advance();
-                return new SearchPath(
-                        from(start), t.text().substring(1, t.text().length() - 1));
+                return new SearchPath(from(start), t);
             }
             case URI -> {
                 advance();
-                return new StrLit(from(start), t.text());
+                return new Uri(from(start), t);
             }
             case LPAREN -> {
                 advance();
-                Expr e = parseExpr();
-                expect(RPAREN);
-                return e;
+                Node e = parseExpr();
+                Token close = expect(RPAREN);
+                return new Paren(from(start), t, e, close);
             }
-            case LET -> {
-                advance();
-                expect(LBRACE);
-                Attrs binds = new Attrs(new Pos(start, start), true);
-                parseBinds(binds, RBRACE);
-                expect(RBRACE);
-                Pos pos = from(start);
-                return new Select(pos, binds, List.of(new AttrName("body", null)), null);
-            }
-            case REC, LBRACE -> {
-                boolean rec = accept(REC);
-                expect(LBRACE);
-                Attrs attrs = new Attrs(new Pos(start, start), rec);
-                parseBinds(attrs, RBRACE);
-                expect(RBRACE);
-                attrs.pos = from(start);
-                return attrs;
+            case LET, REC, LBRACE -> {
+                Token rec = t.type() == LBRACE ? null : advance();
+                Token open = expect(LBRACE);
+                List<Binding> binds = parseBinds(RBRACE);
+                Token close = expect(RBRACE);
+                return new AttrSet(from(start), rec, open, binds, close);
             }
             case LBRACK -> {
                 advance();
-                List<Expr> items = new ArrayList<>();
+                List<Node> items = new ArrayList<>();
                 while (!at(RBRACK)) items.add(parseSelect());
-                advance();
-                return new ListExpr(from(start), items);
+                Token close = advance();
+                return new ListExpr(from(start), t, items, close);
             }
             default -> throw unexpected();
         }
     }
 
-    private Expr parseString(int start) {
+    private Node parseString(int start) {
         if (!at(STR_OPEN)) throw unexpected();
+        Token open = cur;
         prev = cur;
-        List<Expr> parts = new ArrayList<>();
-        boolean interpolated = false;
+        List<Part> parts = new ArrayList<>();
         while (true) {
             int partStart = lexer.pos;
             Lexer.Part p = lexer.stringPart();
             if (p.kind() == Lexer.PartKind.END) break;
-            if (p.kind() == Lexer.PartKind.LIT) {
-                parts.add(new StrLit(new Pos(partStart, lexer.pos), p.text()));
-            } else {
-                parts.add(parseInterpolation());
-                interpolated = true;
-            }
+            parts.add(
+                    p.kind() == Lexer.PartKind.LIT
+                            ? new Lit(partStart, lexer.pos, p.text(), p.hasIndentation())
+                            : parseInterpolation());
         }
+        Token close = new Token(STR_OPEN, "\"", lexer.pos - 1, lexer.pos, false);
         cur = lexer.next();
         prev = new Token(STR_OPEN, "\"", start, cur.start(), false);
-        Pos pos = from(start);
-        if (parts.isEmpty()) return new StrLit(pos, "");
-        if (!interpolated) return new StrLit(pos, ((StrLit) parts.getFirst()).value());
-        return new Interp(pos, false, parts);
+        return new Str(from(start), open, parts, close);
     }
 
     /** Called right after {@code ${}; leaves the lexer right after the closing brace. */
-    private Expr parseInterpolation() {
+    private Interp parseInterpolation() {
+        Token open = new Token(DOLLAR_CURLY, "${", lexer.pos - 2, lexer.pos, false);
         cur = lexer.next();
-        Expr e = parseExpr();
+        Node e = parseExpr();
         if (!at(RBRACE)) throw unexpected();
-        return e;
+        return new Interp(open, e, cur);
     }
 
-    private Expr parseIndString(int start) {
+    private Node parseIndString(int start) {
+        Token open = cur;
         prev = cur;
-        List<Object> parts = new ArrayList<>();
+        List<Part> parts = new ArrayList<>();
         while (true) {
+            int partStart = lexer.pos;
             Lexer.Part p = lexer.indStringPart();
             if (p.kind() == Lexer.PartKind.END) break;
-            parts.add(p.kind() == Lexer.PartKind.LIT ? p : parseInterpolation());
+            parts.add(
+                    p.kind() == Lexer.PartKind.LIT
+                            ? new Lit(partStart, lexer.pos, p.text(), p.hasIndentation())
+                            : parseInterpolation());
         }
+        Token close = new Token(IND_STR_OPEN, "''", lexer.pos - 2, lexer.pos, false);
         cur = lexer.next();
         prev = new Token(IND_STR_OPEN, "''", start, cur.start(), false);
-        return stripIndentation(from(start), parts);
+        return new Str(from(start), open, parts, close);
     }
 
-    /** Port of {@code ParserState::stripIndentation}. */
-    private static Expr stripIndentation(Pos pos, List<Object> parts) {
-        if (parts.isEmpty()) return new StrLit(pos, "");
-        boolean atStartOfLine = true;
-        int minIndent = 1000000;
-        int curIndent = 0;
-        for (Object o : parts) {
-            if (!(o instanceof Lexer.Part p) || !p.hasIndentation()) {
-                if (atStartOfLine) {
-                    atStartOfLine = false;
-                    if (curIndent < minIndent) minIndent = curIndent;
-                }
-                continue;
-            }
-            String s = p.text();
-            for (int j = 0; j < s.length(); j++) {
-                char c = s.charAt(j);
-                if (atStartOfLine) {
-                    if (c == ' ') {
-                        curIndent++;
-                    } else if (c == '\n') {
-                        curIndent = 0;
-                    } else {
-                        atStartOfLine = false;
-                        if (curIndent < minIndent) minIndent = curIndent;
-                    }
-                } else if (c == '\n') {
-                    atStartOfLine = true;
-                    curIndent = 0;
-                }
-            }
-        }
-
-        List<Expr> out = new ArrayList<>();
-        atStartOfLine = true;
-        int curDropped = 0;
-        int n = parts.size();
-        for (Object o : parts) {
-            if (o instanceof Lexer.Part p) {
-                String s = p.text();
-                StringBuilder sb = new StringBuilder();
-                for (int j = 0; j < s.length(); j++) {
-                    char c = s.charAt(j);
-                    if (atStartOfLine) {
-                        if (c == ' ') {
-                            if (curDropped++ >= minIndent) sb.append(c);
-                        } else if (c == '\n') {
-                            curDropped = 0;
-                            sb.append(c);
-                        } else {
-                            atStartOfLine = false;
-                            curDropped = 0;
-                            sb.append(c);
-                        }
-                    } else {
-                        sb.append(c);
-                        if (c == '\n') atStartOfLine = true;
-                    }
-                }
-                String s2 = sb.toString();
-                if (n == 1) {
-                    int nl = s2.lastIndexOf('\n');
-                    if (nl >= 0 && s2.substring(nl + 1).chars().allMatch(ch -> ch == ' ')) s2 = s2.substring(0, nl + 1);
-                }
-                out.add(new StrLit(pos, s2));
-            } else {
-                atStartOfLine = false;
-                curDropped = 0;
-                out.add((Expr) o);
-            }
-            n--;
-        }
-
-        List<Expr> merged = new ArrayList<>();
-        for (Expr e : out) {
-            if (e instanceof StrLit s && !merged.isEmpty() && merged.getLast() instanceof StrLit l) {
-                merged.set(merged.size() - 1, new StrLit(pos, l.value() + s.value()));
-            } else {
-                merged.add(e);
-            }
-        }
-        if (merged.size() == 1 && merged.getFirst() instanceof StrLit s) return new StrLit(pos, s.value());
-        return new Interp(pos, false, merged);
-    }
-
-    private Expr parsePath(int start) {
+    private Node parsePath(int start) {
         Token t = cur;
         prev = t;
-        String text = t.text();
         if (!t.interp()) {
             cur = lexer.next();
-            return new PathLit(from(start), text);
+            return new Path(from(start), t, List.of());
         }
-        List<Expr> parts = new ArrayList<>();
-        parts.add(new PathLit(new Pos(t.start(), t.end()), text));
-        String last = text;
+        List<Part> parts = new ArrayList<>();
+        String last = t.text();
         while (true) {
             int partStart = lexer.pos;
             Lexer.Part p = lexer.pathPart();
             if (p.kind() == Lexer.PartKind.END) break;
             if (p.kind() == Lexer.PartKind.LIT) {
-                parts.add(new StrLit(new Pos(partStart, lexer.pos), p.text()));
+                parts.add(new Lit(partStart, lexer.pos, p.text(), false));
                 last = p.text();
             } else {
                 parts.add(parseInterpolation());
@@ -518,122 +393,87 @@ public final class Parser {
         if (last.endsWith("/")) throw new ParseException("path has a trailing slash", lexer.pos);
         cur = lexer.next();
         prev = new Token(PATH, "", start, lexer.pos, false);
-        return new Interp(new Pos(start, prev.end()), true, parts);
+        return new Path(new Pos(start, prev.end()), t, parts);
     }
 
-    private AttrName parseAttr() {
+    private AttrNode parseAttr() {
         int start = cur.start();
         switch (cur.type()) {
             case ID, OR_KW -> {
-                return new AttrName(advance().text(), null);
+                Token t = advance();
+                return new Ident(from(start), t);
             }
             case STR_OPEN -> {
-                Expr s = parseString(start);
-                return s instanceof StrLit l ? new AttrName(l.value(), null) : new AttrName(null, s);
+                return (Str) parseString(start);
             }
             case DOLLAR_CURLY -> {
-                advance();
-                Expr e = parseExpr();
-                expect(RBRACE);
-                return e instanceof StrLit l ? new AttrName(l.value(), null) : new AttrName(null, e);
+                Token open = advance();
+                Node e = parseExpr();
+                Token close = expect(RBRACE);
+                return new Dyn(from(start), open, e, close);
             }
             default -> throw unexpected();
         }
     }
 
-    private List<AttrName> parseAttrPath() {
-        List<AttrName> path = new ArrayList<>();
-        path.add(parseAttr());
-        while (accept(DOT)) path.add(parseAttr());
+    private List<Sel> parseAttrPath() {
+        List<Sel> path = new ArrayList<>();
+        path.add(new Sel(null, parseAttr()));
+        Token dot;
+        while ((dot = accept(DOT)) != null) path.add(new Sel(dot, parseAttr()));
         return path;
     }
 
-    private void parseBinds(Attrs attrs, TokenType end) {
+    private List<Binding> parseBinds(TokenType end) {
+        List<Binding> binds = new ArrayList<>();
         while (!at(end)) {
             int start = cur.start();
-            if (accept(INHERIT)) {
-                InheritSource source = null;
-                if (accept(LPAREN)) {
-                    source = new InheritSource(parseExpr());
-                    expect(RPAREN);
+            Token inherit = accept(INHERIT);
+            if (inherit != null) {
+                Paren from = null;
+                if (at(LPAREN)) {
+                    Token open = advance();
+                    Node e = parseExpr();
+                    Token close = expect(RPAREN);
+                    from = new Paren(from(open.start()), open, e, close);
                 }
+                List<AttrNode> names = new ArrayList<>();
                 while (!at(SEMI)) {
-                    int nameStart = cur.start();
-                    AttrName name = parseAttr();
-                    if (name.dynamic() != null) {
-                        throw new ParseException("dynamic attributes not allowed in inherit", nameStart);
+                    AttrNode name = parseAttr();
+                    if (!isStatic(name)) {
+                        throw new ParseException(
+                                "dynamic attributes not allowed in inherit",
+                                name.pos().start());
                     }
-                    Pos pos = from(nameStart);
-                    if (attrs.attrs.containsKey(name.name())) throw dupAttr(name.name(), nameStart);
-                    attrs.attrs.put(
-                            name.name(),
-                            source == null
-                                    ? new AttrDef(new Var(pos, name.name()), pos, AttrKind.INHERITED, null)
-                                    : new AttrDef(null, pos, AttrKind.INHERITED_FROM, source));
+                    names.add(name);
                 }
-                advance();
+                binds.add(new Inherit(inherit, from, names, advance()));
             } else {
-                List<AttrName> path = parseAttrPath();
-                expect(ASSIGN);
-                Expr value = parseExpr();
-                expect(SEMI);
-                addAttr(attrs, path, value, from(start));
+                List<Sel> path = parseAttrPath();
+                Token assign = expect(ASSIGN);
+                Node value = parseExpr();
+                Token semi = expect(SEMI);
+                binds.add(new Assign(from(start), path, assign, value, semi));
             }
         }
+        return binds;
     }
 
-    private static ParseException dupAttr(String path, int offset) {
-        return new ParseException("attribute '" + path + "' already defined", offset);
+    /** Whether an attribute name lowers to a constant {@link Ast.StrLit}. */
+    static boolean isStatic(AttrNode name) {
+        return switch (name) {
+            case Ident i -> true;
+            case Str s -> isConstant(s);
+            case Dyn d -> isConstant(d.expr());
+        };
     }
 
-    private static String showPath(List<AttrName> path) {
-        return String.join(".", path.stream().map(AttrName::toString).toList());
-    }
-
-    /** Port of {@code ParserState::addAttr}, which merges nested attribute paths. */
-    private static void addAttr(Attrs attrs, List<AttrName> path, Expr value, Pos pos) {
-        for (int i = 0; i < path.size() - 1; i++) {
-            AttrName name = path.get(i);
-            Attrs nested;
-            if (name.name() != null) {
-                AttrDef existing = attrs.attrs.get(name.name());
-                if (existing != null) {
-                    if (existing.kind() != AttrKind.INHERITED && existing.value() instanceof Attrs a) {
-                        nested = a;
-                    } else {
-                        throw dupAttr(showPath(path.subList(0, i + 1)), pos.start());
-                    }
-                } else {
-                    nested = new Attrs(pos, false);
-                    attrs.attrs.put(name.name(), new AttrDef(nested, pos, AttrKind.PLAIN, null));
-                }
-            } else {
-                nested = new Attrs(pos, false);
-                attrs.dynamic.add(new DynAttr(name.dynamic(), nested, pos));
-            }
-            attrs = nested;
-        }
-        AttrName last = path.getLast();
-        if (last.name() == null) {
-            attrs.dynamic.add(new DynAttr(last.dynamic(), value, pos));
-            return;
-        }
-        AttrDef existing = attrs.attrs.get(last.name());
-        if (existing == null) {
-            attrs.attrs.put(last.name(), new AttrDef(value, pos, AttrKind.PLAIN, null));
-            return;
-        }
-        if (existing.kind() != AttrKind.INHERITED
-                && existing.value() instanceof Attrs target
-                && value instanceof Attrs ae) {
-            for (var e : ae.attrs.entrySet()) {
-                if (target.attrs.containsKey(e.getKey()))
-                    throw dupAttr(e.getKey(), e.getValue().pos().start());
-                target.attrs.put(e.getKey(), e.getValue());
-            }
-            target.dynamic.addAll(ae.dynamic);
-        } else {
-            throw dupAttr(showPath(path), pos.start());
-        }
+    private static boolean isConstant(Node e) {
+        return switch (e) {
+            case Str s -> s.parts().stream().allMatch(p -> p instanceof Lit);
+            case Uri u -> true;
+            case Paren p -> isConstant(p.expr());
+            default -> false;
+        };
     }
 }
