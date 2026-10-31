@@ -63,6 +63,21 @@ public final class Types {
         throw expected("a Boolean", v);
     }
 
+    /** Nix's {@code forceStringNoCtx}. */
+    public static String stringNoContext(Object v) {
+        NixString s = string(v);
+        if (s.context != null) {
+            String c = s.context.iterator().next();
+            int sep = c.indexOf('!', 1);
+            String path = c.startsWith("=")
+                    ? c.substring(1) + " (deep)"
+                    : c.startsWith("!") ? c.substring(sep + 1) + "^" + c.substring(1, sep) : c;
+            throw new NixException(
+                    "the string '" + s.value + "' is not allowed to refer to a store path (such as '" + path + "')");
+        }
+        return s.value;
+    }
+
     public static NixString string(Object v) {
         v = Thunk.force(v);
         if (v instanceof NixString s) return s;

@@ -74,7 +74,7 @@ final class Strings {
             }
         });
         b.add("parseDrvName", 1, a -> {
-            String s = Coerce.toNixString(a[0], false, false).value;
+            String s = Types.stringNoContext(a[0]);
             String name = s;
             String version = "";
             for (int i = 0; i < s.length(); i++) {
