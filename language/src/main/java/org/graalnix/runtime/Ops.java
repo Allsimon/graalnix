@@ -31,9 +31,9 @@ public final class Ops {
                 Object q = y.getRaw("outPath");
                 if (p != null && q != null) return equal(p, q);
             }
-            if (!Arrays.equals(x.keys, y.keys)) return false;
+            if (!Arrays.equals(x.keys(), y.keys())) return false;
             for (int i = 0; i < x.size(); i++) {
-                if (x.values[i] != y.values[i] && !equal(x.values[i], y.values[i])) return false;
+                if (x.values()[i] != y.values()[i] && !equal(x.values()[i], y.values()[i])) return false;
             }
             return true;
         }

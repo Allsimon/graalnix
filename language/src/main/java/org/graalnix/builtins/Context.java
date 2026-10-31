@@ -71,8 +71,8 @@ final class Context {
             TreeSet<String> ctx = s.context == null ? new TreeSet<>() : new TreeSet<>(s.context);
             NixAttrs attrs = Types.attrs(a[1]);
             for (int i = 0; i < attrs.size(); i++) {
-                String path = attrs.keys[i];
-                NixAttrs info = Types.attrs(attrs.values[i]);
+                String path = attrs.keys()[i];
+                NixAttrs info = Types.attrs(attrs.values()[i]);
                 Object p = info.get("path");
                 if (p != null && Types.bool(p)) ctx.add(path);
                 Object all = info.get("allOutputs");

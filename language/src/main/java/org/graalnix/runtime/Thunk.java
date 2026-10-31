@@ -8,7 +8,10 @@ public final class Thunk {
     /** Stands in for {@code env} while the thunk is being evaluated. */
     private static final Object EVALUATING = new Object();
 
-    /** A {@link CallTarget} called with {@code env}, a {@link Supplier}, or a function applied to {@code env}. */
+    /**
+     * A {@link CallTarget} called with {@code env}, a {@link Supplier}, a {@link MapAttrs} entry whose key is {@code
+     * env}, or a function applied to {@code env}.
+     */
     private Object code;
 
     private Object env;
@@ -33,6 +36,16 @@ public final class Thunk {
         return new Thunk(fn, arg, true);
     }
 
+    /** The values of {@code mapAttrs fn attrs}; most are never forced, so each holds only its key. */
+    public static Object[] mapAttrs(Object fn, NixAttrs attrs) {
+        MapAttrs m = new MapAttrs(fn, attrs);
+        Object[] out = new Object[attrs.size()];
+        for (int i = 0; i < out.length; i++) out[i] = new Thunk(m, attrs.keys()[i], true);
+        return out;
+    }
+
+    private record MapAttrs(Object fn, NixAttrs attrs) {}
+
     public static Thunk apply(Object fn, Object a, Object b) {
         return new Thunk(() -> Apply.apply(Apply.apply(fn, a), b));
     }
@@ -55,6 +68,10 @@ public final class Thunk {
             Object v = switch (code) {
                 case CallTarget target -> target.call(e);
                 case Supplier<?> supplier -> supplier.get();
+                case MapAttrs m -> {
+                    String key = (String) e;
+                    yield Apply.apply(Apply.apply(m.fn, new NixString(key)), m.attrs.getRaw(key));
+                }
                 default -> Apply.apply(code, e);
             };
             value = Thunk.force(v);

@@ -36,7 +36,7 @@ public final class Printer {
         v = Thunk.force(v);
         if (!seen.add(v)) return;
         if (v instanceof NixAttrs a) {
-            for (Object x : a.values) forceDeep(x, seen);
+            for (Object x : a.values()) forceDeep(x, seen);
         } else if (v instanceof NixList l) {
             for (Object x : l.items) forceDeep(x, seen);
         }
@@ -89,9 +89,9 @@ public final class Printer {
     private void attrs(NixAttrs a) {
         out.append("{ ");
         for (int i = 0; i < a.size(); i++) {
-            attrName(out, a.keys[i]);
+            attrName(out, a.keys()[i]);
             out.append(" = ");
-            value(a.values[i]);
+            value(a.values()[i]);
             out.append("; ");
         }
         out.append("}");

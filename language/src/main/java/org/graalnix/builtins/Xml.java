@@ -82,8 +82,8 @@ final class Xml {
 
     private void showAttrs(NixAttrs a) {
         for (int i = 0; i < a.size(); i++) {
-            open("attr", attr("name", a.keys[i]));
-            value(a.values[i]);
+            open("attr", attr("name", a.keys()[i]));
+            value(a.values()[i]);
             close("attr");
         }
     }

@@ -115,7 +115,7 @@ public final class NixContext {
     @TruffleBoundary
     public Object scopedImport(NixAttrs scope, String path) {
         String file = resolveImport(path);
-        RootCallTarget target = parse(readFile(file), file, parentDir(file), scope.keys);
+        RootCallTarget target = parse(readFile(file), file, parentDir(file), scope.keys());
         return Thunk.force(target.call(new Object[] {null, scope}));
     }
 

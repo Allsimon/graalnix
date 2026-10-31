@@ -1,5 +1,6 @@
 package org.graalnix.nodes;
 
+import com.oracle.truffle.api.frame.Frame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import org.graalnix.runtime.Thunk;
 
@@ -14,7 +15,13 @@ public final class ReadVarNode extends NixNode {
 
     @Override
     public Object execute(VirtualFrame frame) {
-        return Thunk.force(executeLazy(frame));
+        Frame f = Frames.up(frame, depth);
+        Object v = f.getObject(slot);
+        if (v instanceof Thunk t) {
+            v = t.force();
+            f.setObject(slot, v);
+        }
+        return v;
     }
 
     @Override

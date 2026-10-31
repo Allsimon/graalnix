@@ -12,10 +12,10 @@ final class AttrSets {
         b.add("attrNames", 1, a -> {
             NixAttrs s = Types.attrs(a[0]);
             Object[] out = new Object[s.size()];
-            for (int i = 0; i < out.length; i++) out[i] = new NixString(s.keys[i]);
+            for (int i = 0; i < out.length; i++) out[i] = new NixString(s.keys()[i]);
             return new NixList(out);
         });
-        b.add("attrValues", 1, a -> new NixList(Types.attrs(a[0]).values.clone()));
+        b.add("attrValues", 1, a -> new NixList(Types.attrs(a[0]).values().clone()));
         b.add("getAttr", 2, a -> {
             String name = Types.string(a[0]).value;
             Object v = Types.attrs(a[1]).get(name);
@@ -37,12 +37,12 @@ final class AttrSets {
             if (dropped == 0) return s;
             String[] k = new String[s.size() - dropped];
             Object[] v = new Object[k.length];
-            var p = s.positions == null ? null : new com.oracle.truffle.api.source.SourceSection[k.length];
+            var p = s.positions() == null ? null : new com.oracle.truffle.api.source.SourceSection[k.length];
             for (int i = 0, o = 0; i < s.size(); i++) {
                 if (drop[i]) continue;
-                k[o] = s.keys[i];
-                v[o] = s.values[i];
-                if (p != null) p[o] = s.positions[i];
+                k[o] = s.keys()[i];
+                v[o] = s.values()[i];
+                if (p != null) p[o] = s.positions()[i];
                 o++;
             }
             return new NixAttrs(k, v, p);
@@ -64,12 +64,12 @@ final class AttrSets {
             NixAttrs y = Types.attrs(a[1]);
             List<Integer> keep = new ArrayList<>();
             if (x.size() < y.size()) {
-                for (String k : x.keys) {
+                for (String k : x.keys()) {
                     int j = y.indexOf(k);
                     if (j >= 0) keep.add(j);
                 }
             } else {
-                for (int i = 0; i < y.size(); i++) if (x.has(y.keys[i])) keep.add(i);
+                for (int i = 0; i < y.size(); i++) if (x.has(y.keys()[i])) keep.add(i);
             }
             return subset(y, keep);
         });
@@ -84,16 +84,14 @@ final class AttrSets {
         });
         b.add("mapAttrs", 2, a -> {
             NixAttrs s = Types.attrs(a[1]);
-            Object[] vals = new Object[s.size()];
-            for (int i = 0; i < vals.length; i++) vals[i] = Thunk.apply(a[0], new NixString(s.keys[i]), s.values[i]);
-            return new NixAttrs(s.keys, vals, s.positions);
+            return new NixAttrs(s.keys(), Thunk.mapAttrs(a[0], s), s.positions());
         });
         b.add("zipAttrsWith", 2, a -> {
             TreeMap<String, List<Object>> m = new TreeMap<>();
             for (Object x : Types.list(a[1]).items) {
                 NixAttrs s = Types.attrs(x);
                 for (int i = 0; i < s.size(); i++)
-                    m.computeIfAbsent(s.keys[i], k -> new ArrayList<>()).add(s.values[i]);
+                    m.computeIfAbsent(s.keys()[i], k -> new ArrayList<>()).add(s.values()[i]);
             }
             TreeMap<String, Object> out = new TreeMap<>();
             m.forEach((k, v) -> out.put(k, Thunk.apply(a[0], new NixString(k), new NixList(v.toArray()))));
@@ -119,11 +117,11 @@ final class AttrSets {
     static NixAttrs subset(NixAttrs s, List<Integer> keep) {
         String[] k = new String[keep.size()];
         Object[] v = new Object[keep.size()];
-        var p = s.positions == null ? null : new com.oracle.truffle.api.source.SourceSection[keep.size()];
+        var p = s.positions() == null ? null : new com.oracle.truffle.api.source.SourceSection[keep.size()];
         for (int i = 0; i < k.length; i++) {
-            k[i] = s.keys[keep.get(i)];
-            v[i] = s.values[keep.get(i)];
-            if (p != null) p[i] = s.positions[keep.get(i)];
+            k[i] = s.keys()[keep.get(i)];
+            v[i] = s.values()[keep.get(i)];
+            if (p != null) p[i] = s.positions()[keep.get(i)];
         }
         return new NixAttrs(k, v, p);
     }

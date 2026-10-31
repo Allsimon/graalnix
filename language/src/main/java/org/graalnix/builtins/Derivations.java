@@ -99,9 +99,9 @@ public final class Derivations {
         StringBuilder json = structured ? new StringBuilder("{") : null;
 
         for (int i = 0; i < attrs.size(); i++) {
-            String key = attrs.keys[i];
+            String key = attrs.keys()[i];
             if (key.equals("__ignoreNulls")) continue;
-            Object v = Thunk.force(attrs.values[i]);
+            Object v = Thunk.force(attrs.values()[i]);
             if (ignoreNulls && v == NixNull.INSTANCE) continue;
             if (key.equals("__contentAddressed") && Types.bool(v))
                 throw error(drvName, "content-addressed derivations are not supported");
