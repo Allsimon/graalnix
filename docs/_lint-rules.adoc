@@ -152,6 +152,10 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 |warning
 |A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.
 
+|<<lint-env-variable,`env-variable`>>
+|warning
+|A `NIX_` variable such as `NIX_CFLAGS_COMPILE` set beside the attributes of a derivation: with `__structuredAttrs`, only `env` is exported, so the compiler wrapper would not see it. The fix moves it to `env`, through `toString` unless it is a string already. It is withheld when `env` is not an attribute set written in place, or the file refers to the variable elsewhere, as `finalAttrs.NIX_LDFLAGS`.
+
 |===
 
 == Syntax errors
@@ -2009,4 +2013,146 @@ sri-hash.nix:33:13: warning[sri-hash]: use 'hash' with an SRI hash instead of 's
 sri-hash.nix:37:5: warning[manual-inherit]: 'sha256 = sha256;' can be written 'inherit sha256;' [fix]
 sri-hash.nix:37:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256'
 sri-hash.nix:42:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256'
+----
+
+[[lint-env-variable]]
+=== `env-variable`
+
+Severity: warning. A `NIX_` variable such as `NIX_CFLAGS_COMPILE` set beside the attributes of a derivation: with `__structuredAttrs`, only `env` is exported, so the compiler wrapper would not see it. The fix moves it to `env`, through `toString` unless it is a string already. It is withheld when `env` is not an attribute set written in place, or the file refers to the variable elsewhere, as `finalAttrs.NIX_LDFLAGS`.
+
+[source,nix,role="primary"]
+.Original
+----
+{
+  lib,
+  stdenv,
+  buildGoModule,
+}:
+{
+  string = stdenv.mkDerivation {
+    pname = "string";
+    NIX_CFLAGS_COMPILE = "-Wno-error";
+    NIX_LDFLAGS = lib.optionalString stdenv.hostPlatform.isDarwin "-framework Foundation";
+    # A list, which env does not take as such.
+    NIX_CFLAGS_LINK = [
+      "-lm"
+      "-lpthread"
+    ];
+    NIX_DEBUG = lib.optionals stdenv.cc.isClang [ "1" ];
+    NIX_ENFORCE_PURITY = 0;
+    NIX_HARDENING_ENABLE = lib.optionalString stdenv.isLinux "pie" + " fortify";
+    # Shell code reads it from env as well.
+    preBuild = ''
+      export NIX_CFLAGS_COMPILE+=" -DNDEBUG"
+    '';
+  };
+
+  # Merged with the env written in place.
+  merged = buildGoModule (finalAttrs: {
+    pname = "merged";
+    env = {
+      CGO_ENABLED = 0;
+    };
+    NIX_LDFLAGS = "-lz";
+  });
+
+  # Not fixed: env is not written in place.
+  computed = stdenv.mkDerivation {
+    pname = "computed";
+    env = lib.optionalAttrs stdenv.hostPlatform.isDarwin { CC = "clang"; };
+    NIX_LDFLAGS = "-lz";
+  };
+
+  # Not fixed: the file refers to it.
+  referred = stdenv.mkDerivation (finalAttrs: {
+    pname = "referred";
+    NIX_HARDENING_ENABLE = "fortify";
+    passthru.hardening = finalAttrs.NIX_HARDENING_ENABLE;
+  });
+}
+----
+
+[source,nix,role="secondary"]
+.Fixed
+----
+{
+  lib,
+  stdenv,
+  buildGoModule,
+}:
+{
+  string = stdenv.mkDerivation {
+    pname = "string";
+
+    __structuredAttrs = true;
+    strictDeps = true;
+    env.NIX_CFLAGS_COMPILE = "-Wno-error";
+    env.NIX_LDFLAGS = lib.optionalString stdenv.hostPlatform.isDarwin "-framework Foundation";
+    # A list, which env does not take as such.
+    env.NIX_CFLAGS_LINK = toString [
+      "-lm"
+      "-lpthread"
+    ];
+    env.NIX_DEBUG = toString (lib.optionals stdenv.cc.isClang [ "1" ]);
+    env.NIX_ENFORCE_PURITY = 0;
+    NIX_HARDENING_ENABLE = lib.optionalString stdenv.isLinux "pie" + " fortify";
+    # Shell code reads it from env as well.
+    preBuild = ''
+      export NIX_CFLAGS_COMPILE+=" -DNDEBUG"
+    '';
+  };
+
+  # Merged with the env written in place.
+  merged = buildGoModule (_: {
+    pname = "merged";
+
+    __structuredAttrs = true;
+    env = {
+      CGO_ENABLED = 0;
+    };
+    env.NIX_LDFLAGS = "-lz";
+  });
+
+  # Not fixed: env is not written in place.
+  computed = stdenv.mkDerivation {
+    pname = "computed";
+
+    __structuredAttrs = true;
+    strictDeps = true;
+    env = lib.optionalAttrs stdenv.hostPlatform.isDarwin { CC = "clang"; };
+    NIX_LDFLAGS = "-lz";
+  };
+
+  # Not fixed: the file refers to it.
+  referred = stdenv.mkDerivation (finalAttrs: {
+    pname = "referred";
+
+    __structuredAttrs = true;
+    strictDeps = true;
+    NIX_HARDENING_ENABLE = "fortify";
+    passthru.hardening = finalAttrs.NIX_HARDENING_ENABLE;
+  });
+}
+----
+
+[source,text,role="secondary"]
+.Diagnostics
+----
+env-variable.nix:7:12: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+env-variable.nix:7:12: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+env-variable.nix:9:5: warning[env-variable]: set 'NIX_CFLAGS_COMPILE' in 'env', or it is not exported with __structuredAttrs [fix]
+env-variable.nix:10:5: warning[env-variable]: set 'NIX_LDFLAGS' in 'env', or it is not exported with __structuredAttrs [fix]
+env-variable.nix:12:5: warning[env-variable]: set 'NIX_CFLAGS_LINK' in 'env', or it is not exported with __structuredAttrs [fix]
+env-variable.nix:16:5: warning[env-variable]: set 'NIX_DEBUG' in 'env', or it is not exported with __structuredAttrs [fix]
+env-variable.nix:17:5: warning[env-variable]: set 'NIX_ENFORCE_PURITY' in 'env', or it is not exported with __structuredAttrs [fix]
+env-variable.nix:18:5: warning[env-variable]: set 'NIX_HARDENING_ENABLE' in 'env', or it is not exported with __structuredAttrs
+env-variable.nix:26:12: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+env-variable.nix:26:27: warning[unused-lambda-arg]: unused lambda argument 'finalAttrs' [fix]
+env-variable.nix:31:5: warning[env-variable]: set 'NIX_LDFLAGS' in 'env', or it is not exported with __structuredAttrs [fix]
+env-variable.nix:35:14: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+env-variable.nix:35:14: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+env-variable.nix:38:5: warning[env-variable]: set 'NIX_LDFLAGS' in 'env', or it is not exported with __structuredAttrs
+env-variable.nix:42:14: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+env-variable.nix:42:14: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+env-variable.nix:44:5: warning[env-variable]: set 'NIX_HARDENING_ENABLE' in 'env', or it is not exported with __structuredAttrs
 ----
