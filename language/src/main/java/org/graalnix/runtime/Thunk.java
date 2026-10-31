@@ -5,24 +5,32 @@ import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import java.util.function.Supplier;
 
 public final class Thunk {
-    private CallTarget target;
+    /** Stands in for {@code env} while the thunk is being evaluated. */
+    private static final Object EVALUATING = new Object();
+
+    /** A {@link CallTarget} called with {@code env}, a {@link Supplier}, or a function applied to {@code env}. */
+    private Object code;
+
     private Object env;
-    private Supplier<Object> supplier;
     private Object value;
-    private boolean evaluating;
 
     /** A suspended root: forcing calls {@code target} with {@code env} as its only argument. */
     public Thunk(CallTarget target, Object env) {
-        this.target = target;
+        this.code = target;
         this.env = env;
     }
 
     public Thunk(Supplier<Object> supplier) {
-        this.supplier = supplier;
+        this.code = supplier;
+    }
+
+    private Thunk(Object fn, Object arg, boolean application) {
+        this.code = fn;
+        this.env = arg;
     }
 
     public static Thunk apply(Object fn, Object arg) {
-        return new Thunk(() -> Apply.apply(fn, arg));
+        return new Thunk(fn, arg, true);
     }
 
     public static Thunk apply(Object fn, Object a, Object b) {
@@ -40,22 +48,26 @@ public final class Thunk {
 
     @TruffleBoundary
     private Object evaluate() {
-        if (evaluating) throw new NixException("infinite recursion encountered" + describeSource());
-        evaluating = true;
+        Object e = env;
+        if (e == EVALUATING) throw new NixException("infinite recursion encountered" + describeSource());
+        env = EVALUATING;
         try {
-            Object v = target != null ? target.call(env) : supplier.get();
+            Object v = switch (code) {
+                case CallTarget target -> target.call(e);
+                case Supplier<?> supplier -> supplier.get();
+                default -> Apply.apply(code, e);
+            };
             value = Thunk.force(v);
-            target = null;
+            code = null;
             env = null;
-            supplier = null;
             return value;
         } finally {
-            evaluating = false;
+            if (value == null) env = e;
         }
     }
 
     private String describeSource() {
-        if (target instanceof com.oracle.truffle.api.RootCallTarget rt
+        if (code instanceof com.oracle.truffle.api.RootCallTarget rt
                 && rt.getRootNode().getSourceSection() != null) {
             var s = rt.getRootNode().getSourceSection();
             return "\n       while evaluating " + rt.getRootNode().getName() + " at "

@@ -1,10 +1,8 @@
 package org.graalnix.builtins;
 
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.Arrays;
 
-/** Writes an ATerm as Nix byte strings (one char per byte), into a digest or, without one, a growing buffer. */
+/** Writes an ATerm as Nix byte strings (one char per byte) into a digest. */
 final class AtermWriter {
     private static final boolean[] ESCAPED = new boolean[256];
 
@@ -13,7 +11,7 @@ final class AtermWriter {
     }
 
     private final MessageDigest digest;
-    private byte[] buf = new byte[1 << 16];
+    private final byte[] buf = new byte[1 << 16];
     private byte[] scratch = new byte[1 << 12];
     private int len;
 
@@ -23,7 +21,7 @@ final class AtermWriter {
 
     void reset() {
         len = 0;
-        if (digest != null) digest.reset();
+        digest.reset();
     }
 
     AtermWriter put(char c) {
@@ -67,10 +65,6 @@ final class AtermWriter {
         return digest.digest();
     }
 
-    String text() {
-        return new String(buf, 0, len, StandardCharsets.ISO_8859_1);
-    }
-
     // The deprecated getBytes keeps the low byte of each char, which is exactly a Nix byte string, without allocating.
     @SuppressWarnings("deprecation")
     private byte[] bytes(String s) {
@@ -92,11 +86,7 @@ final class AtermWriter {
     }
 
     private void drain() {
-        if (digest == null) {
-            buf = Arrays.copyOf(buf, buf.length * 2);
-        } else {
-            digest.update(buf, 0, len);
-            len = 0;
-        }
+        digest.update(buf, 0, len);
+        len = 0;
     }
 }

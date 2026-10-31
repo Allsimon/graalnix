@@ -36,8 +36,11 @@ public final class Derivations {
         boolean fixed;
     }
 
+    /** What a derivation's dependents need of it, kept instead of the derivation since its env can be large. */
+    private record Closure(Set<String> outputs, Set<String> inputSrcs, Set<String> inputDrvs) {}
+
     /** Derivations produced so far, by .drv path; stands in for reading them back from the store. */
-    private static final Map<String, Drv> DRVS = new HashMap<>();
+    private static final Map<String, Closure> DRVS = new HashMap<>();
 
     private static final Map<String, Map<String, byte[]>> HASH_MODULO = new HashMap<>();
 
@@ -194,7 +197,10 @@ public final class Derivations {
         TreeSet<String> refs = new TreeSet<>(drv.inputSrcs);
         refs.addAll(drv.inputDrvs.keySet());
         String drvPath = StorePaths.text(ctx.storeDir, drvName + ".drv", atermHash(drv, false, null), refs);
-        DRVS.put(drvPath, drv);
+        if (!DRVS.containsKey(drvPath)) {
+            HASH_MODULO.put(drvPath, hashModulo(drv, false));
+            DRVS.put(drvPath, new Closure(drv.outputs.keySet(), drv.inputSrcs, drv.inputDrvs.keySet()));
+        }
 
         TreeMap<String, Object> result = new TreeMap<>();
         result.put("drvPath", new NixString(drvPath, Set.of("=" + drvPath)));
@@ -222,12 +228,12 @@ public final class Derivations {
     }
 
     private static void addDeepClosure(String drvPath, Drv drv) {
-        Drv dep = DRVS.get(drvPath);
+        Closure dep = DRVS.get(drvPath);
         if (dep == null) throw new NixException("derivation '" + drvPath + "' is not known to graalnix");
         drv.inputSrcs.add(drvPath);
-        drv.inputDrvs.computeIfAbsent(drvPath, k -> new TreeSet<>()).addAll(dep.outputs.keySet());
-        for (String src : dep.inputSrcs) drv.inputSrcs.add(src);
-        for (String d : dep.inputDrvs.keySet()) addDeepClosure(d, drv);
+        drv.inputDrvs.computeIfAbsent(drvPath, k -> new TreeSet<>()).addAll(dep.outputs());
+        drv.inputSrcs.addAll(dep.inputSrcs());
+        for (String d : dep.inputDrvs()) addDeepClosure(d, drv);
     }
 
     /** Port of {@code hashDerivationModulo}. */
@@ -255,12 +261,7 @@ public final class Derivations {
 
     private static Map<String, byte[]> pathHashModulo(String drvPath) {
         Map<String, byte[]> h = HASH_MODULO.get(drvPath);
-        if (h == null) {
-            Drv d = DRVS.get(drvPath);
-            if (d == null) throw new NixException("derivation '" + drvPath + "' is not known to graalnix");
-            h = hashModulo(d, false);
-            HASH_MODULO.put(drvPath, h);
-        }
+        if (h == null) throw new NixException("derivation '" + drvPath + "' is not known to graalnix");
         return h;
     }
 
@@ -322,15 +323,6 @@ public final class Derivations {
         ATERM.reset();
         unparse(ATERM, drv, mask, actualInputs);
         return ATERM.digest();
-    }
-
-    /** Returns the ATerm of a derivation produced in this evaluation, or null. */
-    public static String show(String drvPath) {
-        Drv d = DRVS.get(drvPath);
-        if (d == null) return null;
-        AtermWriter w = new AtermWriter(null);
-        unparse(w, d, false, null);
-        return w.text();
     }
 
     static byte[] parseHash(String s, String algo) {
