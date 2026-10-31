@@ -1,13 +1,9 @@
 package org.graalnix.parser;
 
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /** Mirrors the longest-match rules of Nix's flex lexer (src/libexpr/lexer.l). */
 public final class Lexer {
-    private static final Pattern FLOAT = Pattern.compile("(([1-9][0-9]*\\.[0-9]*)|(0?\\.[0-9]+))([Ee][+-]?[0-9]+)?");
-    private static final Pattern URI = Pattern.compile("[a-zA-Z][a-zA-Z0-9+\\-.]*:[a-zA-Z0-9%/?:@&=+$,\\-_.!~*']+");
 
     private static final Map<String, TokenType> KEYWORDS = Map.of(
             "if",
@@ -108,9 +104,43 @@ public final class Lexer {
         return j - p;
     }
 
-    private int matchRegex(Pattern pattern, int p) {
-        Matcher m = pattern.matcher(src).region(p, len);
-        return m.lookingAt() ? m.end() - p : 0;
+    /** {@code (([1-9][0-9]*\.[0-9]*)|(0?\.[0-9]+))([Ee][+-]?[0-9]+)?}, as Nix's lexer. */
+    private int matchFloat(int p) {
+        int i = p;
+        if (at(i) >= '1' && at(i) <= '9') {
+            while (isDigit(at(i))) i++;
+            if (at(i++) != '.') return 0;
+            while (isDigit(at(i))) i++;
+        } else {
+            if (at(i) == '0') i++;
+            if (at(i++) != '.' || !isDigit(at(i))) return 0;
+            while (isDigit(at(i))) i++;
+        }
+        if (at(i) == 'e' || at(i) == 'E') {
+            int j = i + 1;
+            if (at(j) == '+' || at(j) == '-') j++;
+            if (isDigit(at(j))) {
+                while (isDigit(at(j))) j++;
+                i = j;
+            }
+        }
+        return i - p;
+    }
+
+    /** {@code [a-zA-Z][a-zA-Z0-9+\-.]*:[a-zA-Z0-9%/?:@&=+$,\-_.!~*']+}, as Nix's lexer. */
+    private int matchUri(int p) {
+        char c = at(p);
+        if (!(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z')) return 0;
+        int i = p + 1;
+        while (isDigit(at(i)) || isLetter(at(i)) || at(i) == '+' || at(i) == '-' || at(i) == '.') i++;
+        if (at(i++) != ':') return 0;
+        int start = i;
+        while (at(i) != '\0' && (isDigit(at(i)) || isLetter(at(i)) || "%/?:@&=+$,-_.!~*'".indexOf(at(i)) >= 0)) i++;
+        return i > start ? i - p : 0;
+    }
+
+    private static boolean isLetter(char c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
     }
 
     private int matchSegments(int j) {
@@ -163,7 +193,7 @@ public final class Lexer {
             best = TokenType.INT;
             bestLen = n;
         }
-        if ((isDigit(c) || c == '.') && (n = matchRegex(FLOAT, pos)) > bestLen) {
+        if ((isDigit(c) || c == '.') && (n = matchFloat(pos)) > bestLen) {
             best = TokenType.FLOAT;
             bestLen = n;
         }
@@ -179,7 +209,7 @@ public final class Lexer {
             best = TokenType.SPATH;
             bestLen = n;
         }
-        if (isIdStart(c) && (n = matchRegex(URI, pos)) > bestLen) {
+        if (isIdStart(c) && (n = matchUri(pos)) > bestLen) {
             best = TokenType.URI;
             bestLen = n;
         }
