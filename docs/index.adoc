@@ -1,0 +1,20 @@
+= graalnix
+:toc: left
+:toclevels: 2
+:sectanchors:
+:source-highlighter: rouge
+:icons: font
+
+graalnix is an implementation of the Nix language on GraalVM, as a Truffle AST
+interpreter. It evaluates nixpkgs unmodified and computes store paths and `.drv`
+paths in memory, without writing anything to `/nix/store`.
+
+include::_usage.adoc[leveloffset=+1]
+
+include::_cli.adoc[leveloffset=+1]
+
+include::_status.adoc[leveloffset=+1]
+
+include::_architecture.adoc[leveloffset=+1]
+
+include::_building.adoc[leveloffset=+1]

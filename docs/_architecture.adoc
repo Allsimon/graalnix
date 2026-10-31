@@ -1,0 +1,64 @@
+= Architecture
+
+Each top-level folder is a Java module.
+
+`parser/`::
+A hand-written lexer and parser. It builds a concrete syntax tree that keeps
+every token, then lowers it to the evaluator's AST.
+
+`store/`::
+NAR hashing, Nix base32 and store-path computation.
+
+`language/`::
+The Truffle language:
++
+* `Translator`: static scope resolution into Truffle nodes.
+* `nodes/` and `runtime/`: the evaluator and its values.
+* `builtins/`: the builtins.
+* `corepkgs/`: Nix's `derivation.nix` and `fetchurl.nix`, vendored from NixOS/nix.
+
+`launcher/`::
+The command line, built on the polyglot API, plus its native-image build.
+
+`format/`::
+The formatter.
+
+`lint/`::
+The linter.
+
+== Formatter
+
+`org.graalnix.format.Formatter` ports https://github.com/NixOS/nixfmt[nixfmt]
+1.5.0 (MPL-2.0) to the parser's concrete syntax tree. `Formatter.format(src)`
+formats with nixfmt's defaults. `format(src, width, indent, strict)` sets the
+line width, the indentation and nixfmt's strict mode.
+
+== Linter
+
+`org.graalnix.lint.Linter` runs checks in the spirit of
+https://github.com/astro/deadnix[deadnix] (unused bindings),
+https://github.com/oppiliappan/statix[statix] (simpler forms) and
+https://github.com/nix-community/nixd[nixd] (undefined variables, unknown
+builtins, unused `with` and `rec`). `Linter.lint(src)` returns the diagnostics,
+and `Linter.fix(src)` applies the fixes that come with most of them. Both take
+an optional set of `Rule` values to restrict the checks.
+
+== Tests
+
+`language/src/test/java/`::
+The evaluator's test module. Its data are packaged with it, so the tests rerun
+whenever the data change.
++
+* `lang/`: NixOS/nix's `tests/functional/lang` (LGPL-2.1).
+* `tvix/`: Tvix's `eval/src/tests/tvix_tests`.
+* `graalnix/`: graalnix's own regression tests.
+
+`format/src/test/java/nixfmt/`::
+nixfmt's own test suite.
+
+`lint/src/test/java/cases/`::
+The linter's cases.
+
+The upstream suites are kept in sync with https://carvel.dev/vendir/[vendir]. To
+follow a new Nix release, change `ref` in `vendir.yml`, run `vendir sync`, and
+update `lang-symlinks.txt` if upstream added symlinks (the jar cannot hold them).

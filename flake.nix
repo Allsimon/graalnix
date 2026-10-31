@@ -15,12 +15,13 @@
     {
       packages = forAllSystems (pkgs: rec {
         graalnix = pkgs.callPackage ./nix/package.nix { };
+        inherit (graalnix) docs;
         default = graalnix;
       });
 
       checks = forAllSystems (pkgs: {
         inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) graalnix;
-        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests;
+        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests docs;
       });
 
       devShells = forAllSystems (pkgs: {

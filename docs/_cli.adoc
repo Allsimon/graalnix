@@ -1,0 +1,80 @@
+= Command line
+
+----
+graalnix eval [--strict] [--json] [--raw] (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
+graalnix drv-path (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
+----
+
+== Commands
+
+`eval`::
+Evaluates the expression and prints the result in the same format as
+`nix-instantiate --eval`.
+
+`drv-path`::
+Evaluates the expression to a derivation and prints its `drvPath`, like
+`nix-instantiate`. When the derivation's `outputName` is not `out`, the path is
+followed by `!<output>`.
+
+== Input
+
+`-E EXPR`, `--expr EXPR`::
+Evaluates `EXPR`.
+
+`FILE`::
+Evaluates the file. A directory stands for its `default.nix`.
+
+Give exactly one of the two.
+
+`-A ATTR`, `--attr ATTR`::
+Selects an attribute path in the result.
+
+`--arg NAME EXPR`, `--argstr NAME VALUE`::
+If the result is a function, calls it with `NAME` bound to the Nix expression
+`EXPR`, or to the string `VALUE`.
+
+== Output
+
+These apply to `eval`.
+
+`--strict`::
+Forces the result deeply before printing it.
+
+`--json`::
+Prints the result as JSON.
+
+`--raw`::
+Prints a string result as is, without quotes or escapes.
+
+== Evaluation
+
+`-I PATH`::
+Adds an entry to the search path for `<...>` lookups, such as
+`-I nixpkgs=/path/to/nixpkgs`. The entries of `NIX_PATH` come after those given
+with `-I`.
+
+`--system SYS`::
+Sets `builtins.currentSystem`.
+
+`--show-trace`::
+Prints the Nix call stack when the evaluation fails.
+
+== Engine options
+
+Any other option is handed to the GraalVM polyglot engine, as `--name` for
+`name=true` or `--name=value`. This includes the language's own `--nix.*`
+options and the Truffle tools:
+
+`--inspect`::
+Opens the Chrome DevTools debugger.
+
+`--cpusampler`::
+Profiles the evaluation.
+
+Runtime compilation is off by default: on nixpkgs it made evaluations 4 to 10%
+slower for 1.5 times the CPU and memory. Pass `--engine.Compilation=true` to turn
+it back on.
+
+== Exit status
+
+`0` on success, `1` when the evaluation fails and `2` on a usage error.

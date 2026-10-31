@@ -1,0 +1,23 @@
+= Getting started
+
+Build the static native binary (linked against musl) with Nix:
+
+[source,sh]
+----
+nix build .#graalnix
+----
+
+Evaluate an expression:
+
+[source,console]
+----
+$ ./result/bin/graalnix eval --strict -E 'builtins.map (x: x * 2) [ 1 2 3 ]'
+[ 2 4 6 ]
+----
+
+Compute the derivation path of a nixpkgs attribute:
+
+[source,sh]
+----
+./result/bin/graalnix drv-path -I nixpkgs=/path/to/nixpkgs -E 'import <nixpkgs> {}' -A hello
+----
