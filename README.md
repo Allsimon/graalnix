@@ -67,12 +67,12 @@ Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
 
 ## Layout
 
+- `parser/`: a hand-written lexer and parser.
+- `store/`: NAR hashing, Nix base32 and store-path computation.
 - `language/`: the Truffle language. It contains:
-  - `parser/`: a hand-written lexer and parser.
   - `Translator`: static scope resolution into Truffle nodes.
   - `nodes/` and `runtime/`: the evaluator and its values.
   - `builtins/`: the builtins.
-  - `store/`: NAR hashing, Nix base32 and store-path computation.
 - `launcher/`: the CLI, built on the polyglot API, plus its native-image build.
 - `language/src/test/java/`: the test module. Its data are packaged with it,
   so the tests rerun whenever the data change:

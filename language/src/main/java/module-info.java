@@ -27,6 +27,8 @@
 module org.graalnix {
     requires org.graalvm.truffle;
     requires org.graalvm.polyglot;
+    requires org.graalnix.parser;
+    requires org.graalnix.store;
 
     provides com.oracle.truffle.api.provider.TruffleLanguageProvider with org.graalnix.NixLanguageProvider;
 }

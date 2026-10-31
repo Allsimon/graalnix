@@ -16,6 +16,8 @@ let
           ../build.jenesis
           ../language/src/main
           ../launcher/src/main
+          ../parser/src/main
+          ../store/src/main
         ]
         ++ paths
       );
