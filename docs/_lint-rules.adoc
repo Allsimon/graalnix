@@ -128,6 +128,10 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 |warning
 |A `with` that no variable can come from.
 
+|<<lint-missing-phase-hooks,`missing-phase-hooks`>>
+|warning
+|A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and `postInstall` still work. The fix adds the missing calls to strings of several lines.
+
 |===
 
 == Syntax errors
@@ -1253,4 +1257,90 @@ Severity: warning. A `with` that no variable can come from.
 ----
 extra-with.nix:3:12: warning[extra-with]: unused 'with': no variable comes from it [fix]
 extra-with.nix:7:17: warning[extra-with]: unused 'with': no variable comes from it [fix]
+----
+
+== Packaging
+
+Conventions of nixpkgs for derivations.
+
+[[lint-missing-phase-hooks]]
+=== `missing-phase-hooks`
+
+Severity: warning. A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and `postInstall` still work. The fix adds the missing calls to strings of several lines.
+
+[source,nix,role="primary"]
+.Original
+----
+{ stdenv }:
+stdenv.mkDerivation {
+  pname = "example";
+  version = "1.0";
+
+  installPhase = ''
+    mkdir -p $out/bin
+    cp example $out/bin/
+  '';
+
+  # Only the missing call is added.
+  buildPhase = ''
+    runHook preBuild
+    make
+  '';
+
+  checkPhase = ''
+    runHook preCheck
+    make check
+    runHook postCheck
+  '';
+
+  # Not fixed: the calls need lines of their own.
+  configurePhase = "./configure --prefix=$out";
+  fixupPhase = ''true'';
+}
+----
+
+[source,nix,role="secondary"]
+.Fixed
+----
+{ stdenv }:
+stdenv.mkDerivation {
+  pname = "example";
+  version = "1.0";
+
+  installPhase = ''
+    runHook preInstall
+
+    mkdir -p $out/bin
+    cp example $out/bin/
+
+    runHook postInstall
+  '';
+
+  # Only the missing call is added.
+  buildPhase = ''
+    runHook preBuild
+    make
+
+    runHook postBuild
+  '';
+
+  checkPhase = ''
+    runHook preCheck
+    make check
+    runHook postCheck
+  '';
+
+  # Not fixed: the calls need lines of their own.
+  configurePhase = "./configure --prefix=$out";
+  fixupPhase = ''true'';
+}
+----
+
+[source,text,role="secondary"]
+.Diagnostics
+----
+missing-phase-hooks.nix:6:3: warning[missing-phase-hooks]: 'installPhase' does not run 'runHook preInstall' and 'runHook postInstall' [fix]
+missing-phase-hooks.nix:12:3: warning[missing-phase-hooks]: 'buildPhase' does not run 'runHook postBuild' [fix]
+missing-phase-hooks.nix:24:3: warning[missing-phase-hooks]: 'configurePhase' does not run 'runHook preConfigure' and 'runHook postConfigure'
+missing-phase-hooks.nix:25:3: warning[missing-phase-hooks]: 'fixupPhase' does not run 'runHook preFixup' and 'runHook postFixup'
 ----
