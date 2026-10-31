@@ -6,10 +6,24 @@ import java.util.Arrays;
 public final class Ops {
     private Ops() {}
 
+    /** {@code ==}: its operands are fresh values in Nix, so they are never the same cell. */
     @TruffleBoundary
     public static boolean equal(Object a, Object b) {
+        return equalForced(Thunk.force(a), Thunk.force(b));
+    }
+
+    /**
+     * Nix's {@code eqValues} on values held in lists, sets or arguments: forced first, then equal if they are the same
+     * cell. The same forced object stands in for the same cell, which Nix code observes on functions.
+     */
+    @TruffleBoundary
+    public static boolean equalCells(Object a, Object b) {
         a = Thunk.force(a);
         b = Thunk.force(b);
+        return a == b || equalForced(a, b);
+    }
+
+    private static boolean equalForced(Object a, Object b) {
         if (a instanceof Long x && b instanceof Long y) return x.longValue() == y.longValue();
         if ((a instanceof Long || a instanceof Double) && (b instanceof Long || b instanceof Double)) {
             return ((Number) a).doubleValue() == ((Number) b).doubleValue();
@@ -21,7 +35,7 @@ public final class Ops {
         if (a instanceof NixList x && b instanceof NixList y) {
             if (x.size() != y.size()) return false;
             for (int i = 0; i < x.size(); i++) {
-                if (x.items[i] != y.items[i] && !equal(x.items[i], y.items[i])) return false;
+                if (!equalCells(x.items[i], y.items[i])) return false;
             }
             return true;
         }
@@ -29,11 +43,11 @@ public final class Ops {
             if (x.isDerivation() && y.isDerivation()) {
                 Object p = x.getRaw("outPath");
                 Object q = y.getRaw("outPath");
-                if (p != null && q != null) return equal(p, q);
+                if (p != null && q != null) return equalCells(p, q);
             }
             if (!Arrays.equals(x.keys(), y.keys())) return false;
             for (int i = 0; i < x.size(); i++) {
-                if (x.values()[i] != y.values()[i] && !equal(x.values()[i], y.values()[i])) return false;
+                if (!equalCells(x.values()[i], y.values()[i])) return false;
             }
             return true;
         }
@@ -54,7 +68,7 @@ public final class Ops {
             for (int i = 0; ; i++) {
                 if (i == y.size()) return false;
                 if (i == x.size()) return true;
-                if (!equal(x.items[i], y.items[i])) return lessThan(x.items[i], y.items[i]);
+                if (!equalCells(x.items[i], y.items[i])) return lessThan(x.items[i], y.items[i]);
             }
         }
         throw new NixException("cannot compare " + Types.describe(a) + " with " + Types.describe(b));

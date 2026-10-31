@@ -97,7 +97,16 @@ public final class NixContext {
     /** Resolves {@code import} targets: directories mean their {@code default.nix}. */
     public static String resolveImport(String path) {
         if (path.startsWith(Derivations.COREPKGS)) return path;
-        return Files.isDirectory(Path.of(path)) ? path + "/default.nix" : path;
+        Path p = Path.of(path);
+        try {
+            // As resolveExprPath: follow the last component's links, relative to the unresolved parent.
+            for (int i = 0; i < 1024 && Files.isSymbolicLink(p); i++) {
+                p = p.resolveSibling(Files.readSymbolicLink(p)).normalize();
+            }
+        } catch (java.io.IOException e) {
+            throw new NixException("cannot resolve '" + path + "': " + e.getMessage());
+        }
+        return Files.isDirectory(p) ? p + "/default.nix" : p.toString();
     }
 
     @TruffleBoundary
