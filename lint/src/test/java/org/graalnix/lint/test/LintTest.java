@@ -30,7 +30,7 @@ import org.junit.jupiter.api.TestFactory;
  * one, and X.fixed.nix the output of {@link Linter#fix}.
  */
 class LintTest {
-    private static final Path CASES = casesRoot();
+    static final Path CASES = casesRoot();
 
     private static Path casesRoot() {
         try {
@@ -42,7 +42,7 @@ class LintTest {
         }
     }
 
-    private static String read(Path p) throws IOException {
+    static String read(Path p) throws IOException {
         return Files.readString(p, StandardCharsets.UTF_8);
     }
 

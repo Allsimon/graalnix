@@ -4,6 +4,7 @@
 :sectanchors:
 :source-highlighter: rouge
 :icons: font
+:docinfo: shared
 
 graalnix is an implementation of the Nix language on GraalVM, as a Truffle AST
 interpreter. It evaluates nixpkgs unmodified and computes store paths and `.drv`
@@ -16,5 +17,7 @@ include::_cli.adoc[leveloffset=+1]
 include::_status.adoc[leveloffset=+1]
 
 include::_architecture.adoc[leveloffset=+1]
+
+include::_lint-rules.adoc[leveloffset=+1]
 
 include::_building.adoc[leveloffset=+1]
