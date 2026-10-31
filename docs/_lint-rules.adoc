@@ -138,7 +138,11 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 
 |<<lint-missing-structured-attrs,`missing-structured-attrs`>>
 |hint
-|A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The Python builders, which default to `true`, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
+|A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The builders that default it to `true`, such as those for Python, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
+
+|<<lint-missing-strict-deps,`missing-strict-deps`>>
+|hint
+|A derivation that does not set `strictDeps`, which nixpkgs expects to be `true` for new packages. The builders that set it already, such as those for Python, Go and Rust, are not reported. The fix adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it changes the build, since tools must then be in `nativeBuildInputs` and libraries in `buildInputs`, so check that the package still builds.
 
 |===
 
@@ -1316,6 +1320,7 @@ stdenv.mkDerivation {
   version = "1.0";
 
   __structuredAttrs = true;
+  strictDeps = true;
 
   installPhase = ''
     runHook preInstall
@@ -1350,6 +1355,7 @@ stdenv.mkDerivation {
 .Diagnostics
 ----
 missing-phase-hooks.nix:2:1: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-phase-hooks.nix:2:1: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
 missing-phase-hooks.nix:6:3: warning[missing-phase-hooks]: 'installPhase' does not run 'runHook preInstall' and 'runHook postInstall' [fix]
 missing-phase-hooks.nix:12:3: warning[missing-phase-hooks]: 'buildPhase' does not run 'runHook postBuild' [fix]
 missing-phase-hooks.nix:24:3: warning[missing-phase-hooks]: 'configurePhase' does not run 'runHook preConfigure' and 'runHook postConfigure'
@@ -1433,6 +1439,7 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
     version = "2.12";
 
     __structuredAttrs = true;
+    strictDeps = true;
     src = fetchurl {
       url = "mirror://gnu/hello/${finalAttrs.pname}-${finalAttrs.version}.tar.gz";
       hash = "sha256-AAAA";
@@ -1464,11 +1471,13 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
     version = "1.0";
 
     __structuredAttrs = true;
+    strictDeps = true;
     modules = stdenv.mkDerivation (_: {
       pname = "${finalAttrs.pname}-modules";
       inherit (finalAttrs) version;
 
       __structuredAttrs = true;
+      strictDeps = true;
     });
   });
 
@@ -1477,6 +1486,7 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
     pname = "plain";
 
     __structuredAttrs = true;
+    strictDeps = true;
   };
 }
 ----
@@ -1485,21 +1495,25 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
 .Diagnostics
 ----
 missing-final-attrs.nix:9:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-final-attrs.nix:9:11: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
 missing-final-attrs.nix:9:31: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }' [fix]
 missing-final-attrs.nix:23:31: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }'
 missing-final-attrs.nix:31:32: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }' [fix]
 missing-final-attrs.nix:38:12: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-final-attrs.nix:38:12: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
 missing-final-attrs.nix:38:32: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }'
 missing-final-attrs.nix:41:15: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-final-attrs.nix:41:15: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
 missing-final-attrs.nix:41:36: warning[unused-lambda-arg]: unused lambda argument 'finalAttrs' [fix]
 missing-final-attrs.nix:48:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-final-attrs.nix:48:11: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
 missing-final-attrs.nix:48:31: warning[extra-rec]: 'rec' is not needed: no attribute refers to another [fix]
 ----
 
 [[lint-missing-structured-attrs]]
 === `missing-structured-attrs`
 
-Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The Python builders, which default to `true`, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
+Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The builders that default it to `true`, such as those for Python, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
 
 [source,nix,role="primary"]
 .Original
@@ -1508,6 +1522,7 @@ Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkg
   stdenv,
   buildGoModule,
   buildPythonPackage,
+  buildHomeAssistantComponent,
   pname,
   version,
 }:
@@ -1543,6 +1558,11 @@ Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkg
 
   # Defaults to `true`.
   python = buildPythonPackage {
+    inherit pname version;
+  };
+
+  # So does Home Assistant's builder.
+  component = buildHomeAssistantComponent {
     inherit pname version;
   };
 }
@@ -1555,6 +1575,7 @@ Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkg
   stdenv,
   buildGoModule,
   buildPythonPackage,
+  buildHomeAssistantComponent,
   pname,
   version,
 }:
@@ -1563,15 +1584,15 @@ Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkg
     pname = "plain";
     version = "1.0";
 
-    __structuredAttrs = true;
-
     strictDeps = true;
+    __structuredAttrs = true;
   };
 
   final = stdenv.mkDerivation (finalAttrs: {
     inherit pname version;
 
     __structuredAttrs = true;
+    strictDeps = true;
     meta.description = "${finalAttrs.pname} example";
   });
 
@@ -1586,16 +1607,23 @@ Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkg
   set = stdenv.mkDerivation {
     pname = "set";
     __structuredAttrs = true;
+    strictDeps = true;
   };
 
   # Deliberately off.
   off = stdenv.mkDerivation {
     pname = "off";
     __structuredAttrs = false;
+    strictDeps = true;
   };
 
   # Defaults to `true`.
   python = buildPythonPackage {
+    inherit pname version;
+  };
+
+  # So does Home Assistant's builder.
+  component = buildHomeAssistantComponent {
     inherit pname version;
   };
 }
@@ -1604,7 +1632,135 @@ Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkg
 [source,text,role="secondary"]
 .Diagnostics
 ----
-missing-structured-attrs.nix:9:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
-missing-structured-attrs.nix:16:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
-missing-structured-attrs.nix:21:8: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:10:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:17:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:17:11: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+missing-structured-attrs.nix:22:8: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:28:9: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+missing-structured-attrs.nix:34:9: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+----
+
+[[lint-missing-strict-deps]]
+=== `missing-strict-deps`
+
+Severity: hint. A derivation that does not set `strictDeps`, which nixpkgs expects to be `true` for new packages. The builders that set it already, such as those for Python, Go and Rust, are not reported. The fix adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it changes the build, since tools must then be in `nativeBuildInputs` and libraries in `buildInputs`, so check that the package still builds.
+
+[source,nix,role="primary"]
+.Original
+----
+{
+  stdenv,
+  buildGoModule,
+  buildDotnetModule,
+  pname,
+  version,
+}:
+{
+  # The two fixes put both flags together.
+  both = stdenv.mkDerivation {
+    pname = "both";
+    version = "1.0";
+
+    src = ./.;
+  };
+
+  structured = stdenv.mkDerivation (finalAttrs: {
+    inherit pname version;
+
+    __structuredAttrs = true;
+
+    meta.description = "${finalAttrs.pname} example";
+  });
+
+  set = stdenv.mkDerivation {
+    pname = "set";
+    __structuredAttrs = true;
+    strictDeps = true;
+  };
+
+  # Deliberately off.
+  off = stdenv.mkDerivation {
+    pname = "off";
+    __structuredAttrs = true;
+    strictDeps = false;
+  };
+
+  # Go's builder sets it already.
+  go = buildGoModule {
+    __structuredAttrs = true;
+    src = ./.;
+  };
+
+  dotnet = buildDotnetModule {
+    inherit pname version;
+    __structuredAttrs = true;
+  };
+}
+----
+
+[source,nix,role="secondary"]
+.Fixed
+----
+{
+  stdenv,
+  buildGoModule,
+  buildDotnetModule,
+  pname,
+  version,
+}:
+{
+  # The two fixes put both flags together.
+  both = stdenv.mkDerivation {
+    pname = "both";
+    version = "1.0";
+
+    __structuredAttrs = true;
+    strictDeps = true;
+
+    src = ./.;
+  };
+
+  structured = stdenv.mkDerivation (finalAttrs: {
+    inherit pname version;
+
+    __structuredAttrs = true;
+    strictDeps = true;
+
+    meta.description = "${finalAttrs.pname} example";
+  });
+
+  set = stdenv.mkDerivation {
+    pname = "set";
+    __structuredAttrs = true;
+    strictDeps = true;
+  };
+
+  # Deliberately off.
+  off = stdenv.mkDerivation {
+    pname = "off";
+    __structuredAttrs = true;
+    strictDeps = false;
+  };
+
+  # Go's builder sets it already.
+  go = buildGoModule {
+    __structuredAttrs = true;
+    src = ./.;
+  };
+
+  dotnet = buildDotnetModule {
+    inherit pname version;
+    __structuredAttrs = true;
+    strictDeps = true;
+  };
+}
+----
+
+[source,text,role="secondary"]
+.Diagnostics
+----
+missing-strict-deps.nix:10:10: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-strict-deps.nix:10:10: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+missing-strict-deps.nix:17:16: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
+missing-strict-deps.nix:44:12: hint[missing-strict-deps]: set 'strictDeps = true;' [fix]
 ----

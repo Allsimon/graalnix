@@ -22,6 +22,7 @@
       checks = forAllSystems (pkgs: {
         inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) graalnix;
         inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests docs;
+        lint-builders = pkgs.callPackage ./nix/lint-builders.nix { };
       });
 
       devShells = forAllSystems (pkgs: {

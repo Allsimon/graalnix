@@ -2,6 +2,7 @@
   stdenv,
   buildGoModule,
   buildPythonPackage,
+  buildHomeAssistantComponent,
   pname,
   version,
 }:
@@ -37,6 +38,11 @@
 
   # Defaults to `true`.
   python = buildPythonPackage {
+    inherit pname version;
+  };
+
+  # So does Home Assistant's builder.
+  component = buildHomeAssistantComponent {
     inherit pname version;
   };
 }
