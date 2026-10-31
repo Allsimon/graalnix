@@ -29,3 +29,16 @@ directories:
           - eval/src/tests/tvix_tests/identity-*
           - eval/src/tests/tvix_tests/README.md
         newRootPath: eval/src/tests/tvix_tests
+  - path: format/src/test/java/nixfmt
+    contents:
+      - path: .
+        git:
+          url: https://github.com/NixOS/nixfmt
+          ref: v1.5.0
+          depth: 1
+        includePaths:
+          - test/correct/**/*
+          - test/correct-indent-4.nix
+          - test/diff/**/*
+          - test/invalid/**/*
+        newRootPath: test

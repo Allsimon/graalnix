@@ -15,4 +15,12 @@ directories:
       sha: 259a1617ef482482d3425d74502822ac58c4d024
     path: .
   path: language/src/test/java/tvix
+- contents:
+  - git:
+      commitTitle: 'chore: release 1.5.0 (#460)'
+      sha: 3ada88408156ca4893acc1f7c7bc85cd82129f53
+      tags:
+      - v1.5.0
+    path: .
+  path: format/src/test/java/nixfmt
 kind: LockConfig

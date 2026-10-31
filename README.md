@@ -67,14 +67,19 @@ Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
 
 ## Layout
 
-- `parser/`: a hand-written lexer and parser.
+- `parser/`: a hand-written lexer and parser. It builds a concrete syntax
+  tree that keeps every token, then lowers it to the evaluator's AST.
+- `format/`: a formatter, `org.graalnix.format.Formatter`, that ports
+  [nixfmt](https://github.com/NixOS/nixfmt) 1.5.0 (MPL-2.0) on top of the
+  parser. Its tests run nixfmt's own suite from `format/src/test/java/nixfmt/`,
+  kept in sync with vendir.
 - `store/`: NAR hashing, Nix base32 and store-path computation.
 - `language/`: the Truffle language. It contains:
   - `Translator`: static scope resolution into Truffle nodes.
   - `nodes/` and `runtime/`: the evaluator and its values.
   - `builtins/`: the builtins.
 - `launcher/`: the CLI, built on the polyglot API, plus its native-image build.
-- `language/src/test/java/`: the test module. Its data are packaged with it,
+- `language/src/test/java/`: the evaluator's test module. Its data are packaged with it,
   so the tests rerun whenever the data change:
   - `lang/`: NixOS/nix's `tests/functional/lang` (LGPL-2.1), kept in sync
     with [vendir](https://carvel.dev/vendir/). To follow a new Nix release,
