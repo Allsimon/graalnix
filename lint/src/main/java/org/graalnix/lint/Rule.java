@@ -91,9 +91,16 @@ public enum Rule {
     MISSING_STRUCTURED_ATTRS(
             HINT,
             "A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages."
-                    + " The Python builders, which default to `true`, are not reported. The fix adds"
-                    + " `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases"
-                    + " then see lists as Bash arrays, so check that the package still builds.");
+                + " The builders that default it to `true`, such as those for Python, are not reported. The fix adds"
+                + " `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then"
+                + " see lists as Bash arrays, so check that the package still builds."),
+    MISSING_STRICT_DEPS(
+            HINT,
+            "A derivation that does not set `strictDeps`, which nixpkgs expects to be `true` for new packages. The"
+                    + " builders that set it already, such as those for Python, Go and Rust, are not reported. The fix"
+                    + " adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it"
+                    + " changes the build, since tools must then be in `nativeBuildInputs` and libraries in"
+                    + " `buildInputs`, so check that the package still builds.");
 
     private final Severity severity;
     private final String description;

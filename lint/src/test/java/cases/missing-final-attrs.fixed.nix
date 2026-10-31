@@ -11,6 +11,7 @@
     version = "2.12";
 
     __structuredAttrs = true;
+    strictDeps = true;
     src = fetchurl {
       url = "mirror://gnu/hello/${finalAttrs.pname}-${finalAttrs.version}.tar.gz";
       hash = "sha256-AAAA";
@@ -42,11 +43,13 @@
     version = "1.0";
 
     __structuredAttrs = true;
+    strictDeps = true;
     modules = stdenv.mkDerivation (_: {
       pname = "${finalAttrs.pname}-modules";
       inherit (finalAttrs) version;
 
       __structuredAttrs = true;
+      strictDeps = true;
     });
   });
 
@@ -55,5 +58,6 @@
     pname = "plain";
 
     __structuredAttrs = true;
+    strictDeps = true;
   };
 }
