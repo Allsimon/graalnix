@@ -171,6 +171,7 @@ public final class Translator {
             case StrLit str -> tr(e, s);
             case PathLit p -> tr(e, s);
             case Var v -> isStatic(v.name(), s) ? tr(e, s) : thunk(e, s, name);
+            case Lambda l -> tr(e, s, name);
             case ListExpr l when l.items().isEmpty() -> tr(e, s);
             default -> thunk(e, s, name);
         };

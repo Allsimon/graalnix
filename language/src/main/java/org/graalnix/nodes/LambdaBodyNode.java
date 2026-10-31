@@ -96,7 +96,7 @@ public final class LambdaBodyNode extends NixNode {
 
     @TruffleBoundary
     private NixException unexpected(NixAttrs attrs) {
-        for (String k : attrs.keys) {
+        for (String k : attrs.keys()) {
             if (!Arrays.asList(formals).contains(k)) {
                 return new NixException(fn() + " called with unexpected argument '" + k + "'", this);
             }

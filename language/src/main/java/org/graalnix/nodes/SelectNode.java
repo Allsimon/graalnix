@@ -5,7 +5,6 @@ import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import org.graalnix.runtime.NixAttrs;
 import org.graalnix.runtime.NixException;
-import org.graalnix.runtime.Thunk;
 import org.graalnix.runtime.Types;
 
 public final class SelectNode extends NixNode {
@@ -34,12 +33,12 @@ public final class SelectNode extends NixNode {
                 if (fallback != null) return fallback.execute(frame);
                 throw notASet(v);
             }
-            Object r = attrs.getRaw(name);
+            Object r = attrs.get(name);
             if (r == null) {
                 if (fallback != null) return fallback.execute(frame);
                 throw missing(name, attrs);
             }
-            v = Thunk.force(r);
+            v = r;
         }
         return v;
     }
