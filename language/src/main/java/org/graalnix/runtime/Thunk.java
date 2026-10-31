@@ -2,20 +2,28 @@ package org.graalnix.runtime;
 
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.frame.MaterializedFrame;
 import java.util.function.Supplier;
+import org.graalnix.nodes.NixNode;
 
 public final class Thunk {
     /** Stands in for {@code env} while the thunk is being evaluated. */
     private static final Object EVALUATING = new Object();
 
     /**
-     * A {@link CallTarget} called with {@code env}, a {@link Supplier}, a {@link MapAttrs} entry whose key is {@code
+     * A {@link CallTarget} called with {@code env}, a {@link NixNode} executed on {@code env}, a {@link Supplier}, a {@link MapAttrs} entry whose key is {@code
      * env}, or a function applied to {@code env}.
      */
     private Object code;
 
     private Object env;
     private Object value;
+
+    /** A suspended expression evaluated on {@code frame}, the frame it was translated for. */
+    public Thunk(NixNode body, MaterializedFrame frame) {
+        this.code = body;
+        this.env = frame;
+    }
 
     /** A suspended root: forcing calls {@code target} with {@code env} as its only argument. */
     public Thunk(CallTarget target, Object env) {
@@ -67,6 +75,7 @@ public final class Thunk {
         try {
             Object v = switch (code) {
                 case CallTarget target -> target.call(e);
+                case NixNode body -> body.execute((MaterializedFrame) e);
                 case Supplier<?> supplier -> supplier.get();
                 case MapAttrs m -> {
                     String key = (String) e;
@@ -84,6 +93,11 @@ public final class Thunk {
     }
 
     private String describeSource() {
+        if (code instanceof NixNode body && body.getSourceSection() != null) {
+            var s = body.getSourceSection();
+            return "\n       while evaluating <thunk> at " + s.getSource().getName() + ":" + s.getStartLine() + ":"
+                    + s.getStartColumn();
+        }
         if (code instanceof com.oracle.truffle.api.RootCallTarget rt
                 && rt.getRootNode().getSourceSection() != null) {
             var s = rt.getRootNode().getSourceSection();

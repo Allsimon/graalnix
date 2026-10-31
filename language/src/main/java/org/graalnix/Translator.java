@@ -182,12 +182,65 @@ public final class Translator {
         return e instanceof Var ? thunk(e, s, name) : lazy(e, s, name);
     }
 
+    /** Measured on the top-level nixpkgs sweep: 4 and 8 are slower, 32 and beyond no faster. */
+    private static final int IN_PLACE_MAX = 16;
+
     private NixNode thunk(Expr e, Scope s, String name) {
+        int size = strictSize(e);
+        if (size >= 0 && size <= IN_PLACE_MAX) return new InPlaceThunkNode(tr(e, s, name)).at(section(e.pos()));
         Frame frame = new Frame();
         NixNode body = tr(e, new Scope(s, frame, null, -1), name);
         NixRootNode root = new NixRootNode(
                 language, frame.builder.build(), body, name == null ? "<thunk>" : name, section(e.pos()));
         return new ThunkNode(root.getCallTarget()).at(section(e.pos()));
+    }
+
+    /**
+     * The nodes {@code e} evaluates when forced, or -1 when it needs frame slots of its own. Arguments, list items and
+     * attribute values count as one each, since they are suspended on their own.
+     */
+    private static int strictSize(Expr e) {
+        return switch (e) {
+            case IntLit x -> 1;
+            case FloatLit x -> 1;
+            case StrLit x -> 1;
+            case PathLit x -> 1;
+            case SearchPath x -> 1;
+            case CurPos x -> 1;
+            case Var x -> 1;
+            case Lambda x -> 1;
+            case Select x -> dynamic(x.path()) ? -1 : sum(1, x.target(), x.fallback());
+            case HasAttr x -> dynamic(x.path()) ? -1 : sum(1, x.target());
+            case Call x -> sum(1 + x.args().size(), x.fn());
+            case BinOp x -> sum(1, x.left(), x.right());
+            case Not x -> sum(1, x.operand());
+            case If x -> sum(1, x.cond(), x.then(), x.otherwise());
+            case Assert x -> sum(1, x.cond(), x.body());
+            case Interp x -> sum(1, x.parts().toArray(Expr[]::new));
+            case ListExpr x -> 1 + x.items().size();
+            case Attrs x -> {
+                if (x.rec || !x.dynamic.isEmpty()) yield -1;
+                for (AttrDef d : x.attrs.values()) if (d.source() != null) yield -1;
+                yield 1 + x.attrs.size();
+            }
+            case Let x -> -1;
+            case With x -> -1;
+        };
+    }
+
+    private static boolean dynamic(List<AttrName> path) {
+        for (AttrName a : path) if (a.dynamic() != null) return true;
+        return false;
+    }
+
+    private static int sum(int n, Expr... parts) {
+        for (Expr p : parts) {
+            if (p == null) continue;
+            int k = strictSize(p);
+            if (k < 0) return -1;
+            n += k;
+        }
+        return n;
     }
 
     private boolean isStatic(String name, Scope s) {
