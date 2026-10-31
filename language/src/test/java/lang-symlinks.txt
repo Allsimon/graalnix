@@ -3,3 +3,4 @@ lang/readDir/ldir foo
 lang/readDir/linked foo/git-hates-directories
 lang/symlink-resolution/foo/overlays ../overlays
 lang/symlink-resolution/broken nonexistent
+tvix/observable-eval-cache2.nix observable-eval-cache1.nix
