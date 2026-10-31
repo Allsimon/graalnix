@@ -42,5 +42,3 @@ tvix/eval-okay-value-pointer-compare
 tvix/eval-okay-value-pointer-equality
 tvix/eval-fail-cppnix-outer-value-never-pointer-equal
 
-# parseDrvName coerces sets with outPath instead of requiring a string
-tvix/eval-fail-parsedrvname-coerce
