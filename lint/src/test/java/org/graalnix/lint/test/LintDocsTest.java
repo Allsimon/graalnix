@@ -129,6 +129,11 @@ class LintDocsTest {
     }
 
     private static String severity(Rule r) {
-        return r.severity().name().toLowerCase(Locale.ROOT);
+        String emoji = switch (r.severity()) {
+            case ERROR -> "❌";
+            case WARNING -> "⚠️";
+            case HINT -> "💡";
+        };
+        return emoji + " " + r.severity().name().toLowerCase(Locale.ROOT);
     }
 }
