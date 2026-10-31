@@ -23,7 +23,11 @@ public final class BindNode extends NixNode {
 
     @Override
     public Object execute(VirtualFrame frame) {
-        bind(frame);
+        if (slots.length > Lazy.MAX_EXPLODED) {
+            Lazy.bind(slots, values, frame.materialize());
+        } else {
+            bind(frame);
+        }
         return body.execute(frame);
     }
 

@@ -13,10 +13,14 @@ public final class ListNode extends NixNode {
     }
 
     @Override
-    @ExplodeLoop
     public Object execute(VirtualFrame frame) {
+        return new NixList(items.length > Lazy.MAX_EXPLODED ? Lazy.all(items, frame.materialize()) : lazyItems(frame));
+    }
+
+    @ExplodeLoop
+    private Object[] lazyItems(VirtualFrame frame) {
         Object[] out = new Object[items.length];
         for (int i = 0; i < items.length; i++) out[i] = items[i].executeLazy(frame);
-        return new NixList(out);
+        return out;
     }
 }

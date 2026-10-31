@@ -62,8 +62,7 @@ public final class AttrsNode extends NixNode {
     @Override
     @ExplodeLoop
     public Object execute(VirtualFrame frame) {
-        Object[] vals = new Object[values.length];
-        for (int i = 0; i < values.length; i++) vals[i] = values[i].executeLazy(frame);
+        Object[] vals = values.length > Lazy.MAX_EXPLODED ? Lazy.all(values, frame.materialize()) : lazyValues(frame);
         NixAttrs attrs = new NixAttrs(keys, vals, positions);
         if (overridesIndex >= 0) attrs = applyOverrides(frame.materialize(), attrs);
         if (dynNames.length == 0) return attrs;
@@ -73,6 +72,13 @@ public final class AttrsNode extends NixNode {
             attrs = addDynamic(attrs, Types.string(name).value, dynValues[i].executeLazy(frame), dynPositions[i]);
         }
         return attrs;
+    }
+
+    @ExplodeLoop
+    private Object[] lazyValues(VirtualFrame frame) {
+        Object[] vals = new Object[values.length];
+        for (int i = 0; i < values.length; i++) vals[i] = values[i].executeLazy(frame);
+        return vals;
     }
 
     /** Port of the {@code __overrides} handling in {@code ExprAttrs::eval}. */

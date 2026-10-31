@@ -91,28 +91,39 @@ public final class NixAttrs {
 
     /** Returns the raw (possibly unevaluated) value, or null if absent. */
     public Object getRaw(String key) {
-        if (leaves != null) {
-            for (int l = leaves.length - 1; l >= 0; l--) {
-                Object v = leaves[l].getRaw(key);
-                if (v != null) return v;
-            }
-            return null;
+        if (leaves == null) return flatGetRaw(key);
+        for (int l = leaves.length - 1; l >= 0; l--) {
+            Object v = leaves[l].flatGetRaw(key);
+            if (v != null) return v;
         }
+        return null;
+    }
+
+    // Leaves are flat, and staying out of recursion keeps Truffle from inlining lookups without bound.
+    private Object flatGetRaw(String key) {
         int i = indexOf(key, 0, keys.length - 1);
         return i >= 0 ? values[i] : null;
     }
 
     /** Returns the forced value, or null if absent; the value is stored over its thunk, so later reads skip it. */
     public Object get(String key) {
-        if (leaves != null) {
-            for (int l = leaves.length - 1; l >= 0; l--) {
-                Object v = leaves[l].get(key);
-                if (v != null) return v;
-            }
-            return null;
+        if (leaves == null) return flatGet(key);
+        for (int l = leaves.length - 1; l >= 0; l--) {
+            Object v = leaves[l].flatGet(key);
+            if (v != null) return v;
         }
+        return null;
+    }
+
+    private Object flatGet(String key) {
         int i = indexOf(key, 0, keys.length - 1);
-        return i >= 0 ? force(i) : null;
+        if (i < 0) return null;
+        Object v = values[i];
+        if (v instanceof Thunk t) {
+            v = t.force();
+            values[i] = v;
+        }
+        return v;
     }
 
     /** {@link #get} by index into {@link #keys()}. */
@@ -127,12 +138,14 @@ public final class NixAttrs {
     }
 
     public SourceSection position(String key) {
-        if (leaves != null) {
-            for (int l = leaves.length - 1; l >= 0; l--) {
-                if (leaves[l].has(key)) return leaves[l].position(key);
-            }
-            return null;
+        if (leaves == null) return flatPosition(key);
+        for (int l = leaves.length - 1; l >= 0; l--) {
+            if (leaves[l].flatGetRaw(key) != null) return leaves[l].flatPosition(key);
         }
+        return null;
+    }
+
+    private SourceSection flatPosition(String key) {
         int i = indexOf(key, 0, keys.length - 1);
         return i >= 0 && positions != null ? positions[i] : null;
     }
