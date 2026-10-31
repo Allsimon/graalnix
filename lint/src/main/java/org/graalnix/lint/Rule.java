@@ -100,7 +100,13 @@ public enum Rule {
                     + " builders that set it already, such as those for Python, Go and Rust, are not reported. The fix"
                     + " adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it"
                     + " changes the build, since tools must then be in `nativeBuildInputs` and libraries in"
-                    + " `buildInputs`, so check that the package still builds.");
+                    + " `buildInputs`, so check that the package still builds."),
+    DEPRECATED_REPLACE(
+            WARNING,
+            "`substituteInPlace` and the other `substitute` functions called with `--replace`, which is deprecated"
+                    + " and behaves as `--replace-warn`: a pattern that no longer matches only prints a warning. The"
+                    + " fix uses `--replace-fail`, which makes such a build fail instead, so check that the package"
+                    + " still builds.");
 
     private final Severity severity;
     private final String description;
