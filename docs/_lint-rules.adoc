@@ -9,151 +9,151 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 |Rule |Severity |Description
 
 |<<lint-syntax-error,`syntax-error`>>
-|error
+|❌ error
 |The code does not parse, or breaks a rule Nix checks while parsing, such as defining an attribute twice. No other rule runs then.
 
 |<<lint-unused-let-binding,`unused-let-binding`>>
-|warning
+|⚠️ warning
 |A `let` binding that the body never reaches. A binding used only by itself, or by other unused bindings, counts as unused too. The fix removes it.
 
 |<<lint-unused-lambda-arg,`unused-lambda-arg`>>
-|warning
+|⚠️ warning
 |A function argument that the body never uses. The fix renames it to `_`, unless the body uses an outer `_`.
 
 |<<lint-unused-formal,`unused-formal`>>
-|warning
+|⚠️ warning
 |An attribute of a function's pattern that the body never uses. It is not reported when the `@` binding is used, as that may pass it on. The fix removes it only when the pattern has `+...+`, so that callers passing it still work.
 
 |<<lint-unused-at-pattern,`unused-at-pattern`>>
-|warning
+|⚠️ warning
 |An `@` binding that the body never uses. The fix removes it.
 
 |<<lint-bool-comparison,`bool-comparison`>>
-|warning
+|⚠️ warning
 |A comparison with `true` or `false`. There is no fix: `v == true` is also a type test, where `v` alone fails on other types.
 
 |<<lint-bool-simplification,`bool-simplification`>>
-|warning
+|⚠️ warning
 |`!(a == b)`, which is `a != b`, and `!(a != b)`, which is `a == b`.
 
 |<<lint-empty-let-in,`empty-let-in`>>
-|warning
+|⚠️ warning
 |A `let` with no bindings.
 
 |<<lint-collapsible-let-in,`collapsible-let-in`>>
-|warning
+|⚠️ warning
 |A `let` right in the body of another. The fix merges them unless the outer bindings use or bind a name of the inner ones.
 
 |<<lint-legacy-let-syntax,`legacy-let-syntax`>>
-|warning
+|⚠️ warning
 |The deprecated `+let { ...; body = ...; }+`. The fix turns it into `+rec { ...; body = ...; }.body+`.
 
 |<<lint-empty-inherit,`empty-inherit`>>
-|warning
+|⚠️ warning
 |An `inherit` with no names.
 
 |<<lint-empty-pattern,`empty-pattern`>>
-|warning
+|⚠️ warning
 |A function taking `{ }`. There is no fix: `_:` would also accept arguments that are not an empty attribute set.
 
 |<<lint-redundant-pattern-bind,`redundant-pattern-bind`>>
-|warning
+|⚠️ warning
 |`+{ ... }@x: body+`, which can be written `x: body`.
 
 |<<lint-manual-inherit,`manual-inherit`>>
-|warning
+|⚠️ warning
 |`a = a;` in an attribute set that is not recursive, which is `inherit a;`.
 
 |<<lint-manual-inherit-from,`manual-inherit-from`>>
-|warning
+|⚠️ warning
 |`a = e.a;`, which is `inherit (e) a;`.
 
 |<<lint-eta-reduction,`eta-reduction`>>
-|hint
+|💡 hint
 |`x: f x`, which is `f` when `f` is a name or an attribute path that does not use `x`.
 
 |<<lint-useless-parens,`useless-parens`>>
-|warning
+|⚠️ warning
 |Parentheses around a simple expression, or around a whole binding value, `let` body, interpolation or file.
 
 |<<lint-unquoted-uri,`unquoted-uri`>>
-|warning
+|⚠️ warning
 |A URI literal, which is deprecated. The fix quotes it.
 
 |<<lint-deprecated-is-null,`deprecated-is-null`>>
-|warning
+|⚠️ warning
 |`isNull e`, which is `e == null`.
 
 |<<lint-deprecated-to-path,`deprecated-to-path`>>
-|warning
+|⚠️ warning
 |`builtins.toPath`, which is deprecated. There is no fix.
 
 |<<lint-empty-list-concat,`empty-list-concat`>>
-|warning
+|⚠️ warning
 |A concatenation with `[ ]`.
 
 |<<lint-useless-has-attr,`useless-has-attr`>>
-|warning
+|⚠️ warning
 |`if x ? a then x.a else d`, which is `x.a or d`.
 
 |<<lint-faster-builtin,`faster-builtin`>>
-|hint
+|💡 hint
 |`lib.groupBy` and `lib.zipAttrsWith`, which the builtins of the same names implement natively.
 
 |<<lint-repeated-keys,`repeated-keys`>>
-|hint
+|💡 hint
 |Three or more bindings that start with the same attribute, such as `a.b`, `a.c` and `a.d`, which could form one nested attribute set. There is no fix.
 
 |<<lint-undefined-variable,`undefined-variable`>>
-|error
+|❌ error
 |A variable that no binding defines, outside any `with`. Nix rejects the file before evaluating it.
 
 |<<lint-unknown-builtin,`unknown-builtin`>>
-|error
+|❌ error
 |`builtins.x` where `x` is not a builtin, unless the file tests `builtins ? x` or gives an `or` fallback.
 
 |<<lint-prefixed-builtin,`prefixed-builtin`>>
-|warning
+|⚠️ warning
 |`__x` for the builtin `builtins.x`.
 
 |<<lint-shadowed-builtin,`shadowed-builtin`>>
-|warning
+|⚠️ warning
 |A binding that hides a global such as `map`, `true` or `builtins`. Attributes of a `rec` set and names inherited from an expression are not reported.
 
 |<<lint-extra-rec,`extra-rec`>>
-|warning
+|⚠️ warning
 |A `rec` attribute set whose attributes never refer to each other.
 
 |<<lint-extra-with,`extra-with`>>
-|warning
+|⚠️ warning
 |A `with` that no variable can come from.
 
 |<<lint-missing-phase-hooks,`missing-phase-hooks`>>
-|warning
+|⚠️ warning
 |A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and `postInstall` still work. The fix adds the missing calls to strings of several lines.
 
 |<<lint-missing-final-attrs,`missing-final-attrs`>>
-|warning
+|⚠️ warning
 |A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs` also reaches the attributes that use it. The fix rewrites the references to `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs` holds the attributes the builder made, so the fix is only offered when the references are to `pname`, `version` and `src`.
 
 |<<lint-missing-structured-attrs,`missing-structured-attrs`>>
-|hint
+|💡 hint
 |A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The builders that default it to `true`, such as those for Python, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
 
 |<<lint-missing-strict-deps,`missing-strict-deps`>>
-|hint
+|💡 hint
 |A derivation that does not set `strictDeps`, which nixpkgs expects to be `true` for new packages. The builders that set it already, such as those for Python, Go and Rust, are not reported. The fix adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it changes the build, since tools must then be in `nativeBuildInputs` and libraries in `buildInputs`, so check that the package still builds.
 
 |<<lint-deprecated-replace,`deprecated-replace`>>
-|warning
+|⚠️ warning
 |`substituteInPlace` and the other `substitute` functions called with `--replace`, which is deprecated and behaves as `--replace-warn`: a pattern that no longer matches only prints a warning. The fix uses `--replace-fail`, which makes such a build fail instead, so check that the package still builds.
 
 |<<lint-sri-hash,`sri-hash`>>
-|warning
+|⚠️ warning
 |A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.
 
 |<<lint-env-variable,`env-variable`>>
-|warning
+|⚠️ warning
 |A `NIX_` variable such as `NIX_CFLAGS_COMPILE` set beside the attributes of a derivation: with `__structuredAttrs`, only `env` is exported, so the compiler wrapper would not see it. The fix moves it to `env`, through `toString` unless it is a string already. It is withheld when `env` is not an attribute set written in place, or the file refers to the variable elsewhere, as `finalAttrs.NIX_LDFLAGS`.
 
 |===
@@ -163,7 +163,7 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 [[lint-syntax-error]]
 === `syntax-error`
 
-Severity: error. The code does not parse, or breaks a rule Nix checks while parsing, such as defining an attribute twice. No other rule runs then.
+Severity: ❌ error. The code does not parse, or breaks a rule Nix checks while parsing, such as defining an attribute twice. No other rule runs then.
 
 [source,nix,role="primary"]
 .Original
@@ -187,7 +187,7 @@ Bindings that nothing uses, as https://github.com/astro/deadnix[deadnix] finds t
 [[lint-unused-let-binding]]
 === `unused-let-binding`
 
-Severity: warning. A `let` binding that the body never reaches. A binding used only by itself, or by other unused bindings, counts as unused too. The fix removes it.
+Severity: ⚠️ warning. A `let` binding that the body never reaches. A binding used only by itself, or by other unused bindings, counts as unused too. The fix removes it.
 
 [source,nix,role="primary"]
 .Original
@@ -245,7 +245,7 @@ unused-let-binding.nix:14:3: warning[unused-let-binding]: unused let binding 'de
 [[lint-unused-lambda-arg]]
 === `unused-lambda-arg`
 
-Severity: warning. A function argument that the body never uses. The fix renames it to `_`, unless the body uses an outer `_`.
+Severity: ⚠️ warning. A function argument that the body never uses. The fix renames it to `_`, unless the body uses an outer `_`.
 
 [source,nix,role="primary"]
 .Original
@@ -293,7 +293,7 @@ unused-lambda-arg.nix:6:16: warning[unused-lambda-arg]: unused lambda argument '
 [[lint-unused-formal]]
 === `unused-formal`
 
-Severity: warning. An attribute of a function's pattern that the body never uses. It is not reported when the `@` binding is used, as that may pass it on. The fix removes it only when the pattern has `+...+`, so that callers passing it still work.
+Severity: ⚠️ warning. An attribute of a function's pattern that the body never uses. It is not reported when the `@` binding is used, as that may pass it on. The fix removes it only when the pattern has `+...+`, so that callers passing it still work.
 
 [source,nix,role="primary"]
 .Original
@@ -349,7 +349,7 @@ unused-formal.nix:11:7: warning[unused-formal]: unused formal argument 'b' [fix]
 [[lint-unused-at-pattern]]
 === `unused-at-pattern`
 
-Severity: warning. An `@` binding that the body never uses. The fix removes it.
+Severity: ⚠️ warning. An `@` binding that the body never uses. The fix removes it.
 
 [source,nix,role="primary"]
 .Original
@@ -385,7 +385,7 @@ Code with a simpler or more idiomatic form, as https://github.com/oppiliappan/st
 [[lint-bool-comparison]]
 === `bool-comparison`
 
-Severity: warning. A comparison with `true` or `false`. There is no fix: `v == true` is also a type test, where `v` alone fails on other types.
+Severity: ⚠️ warning. A comparison with `true` or `false`. There is no fix: `v == true` is also a type test, where `v` alone fails on other types.
 
 [source,nix,role="primary"]
 .Original
@@ -408,7 +408,7 @@ bool-comparison.nix:4:4: warning[bool-comparison]: comparison with 'false'; if t
 [[lint-bool-simplification]]
 === `bool-simplification`
 
-Severity: warning. `!(a == b)`, which is `a != b`, and `!(a != b)`, which is `a == b`.
+Severity: ⚠️ warning. `!(a == b)`, which is `a != b`, and `!(a != b)`, which is `a == b`.
 
 [source,nix,role="primary"]
 .Original
@@ -442,7 +442,7 @@ bool-simplification.nix:4:4: warning[bool-simplification]: negated comparison; u
 [[lint-empty-let-in]]
 === `empty-let-in`
 
-Severity: warning. A `let` with no bindings.
+Severity: ⚠️ warning. A `let` with no bindings.
 
 [source,nix,role="primary"]
 .Original
@@ -472,7 +472,7 @@ empty-let-in.nix:4:7: warning[empty-let-in]: 'let' with no bindings [fix]
 [[lint-collapsible-let-in]]
 === `collapsible-let-in`
 
-Severity: warning. A `let` right in the body of another. The fix merges them unless the outer bindings use or bind a name of the inner ones.
+Severity: ⚠️ warning. A `let` right in the body of another. The fix merges them unless the outer bindings use or bind a name of the inner ones.
 
 [source,nix,role="primary"]
 .Original
@@ -532,7 +532,7 @@ collapsible-let-in.nix:16:5: warning[collapsible-let-in]: this 'let' can be merg
 [[lint-legacy-let-syntax]]
 === `legacy-let-syntax`
 
-Severity: warning. The deprecated `+let { ...; body = ...; }+`. The fix turns it into `+rec { ...; body = ...; }.body+`.
+Severity: ⚠️ warning. The deprecated `+let { ...; body = ...; }+`. The fix turns it into `+rec { ...; body = ...; }.body+`.
 
 [source,nix,role="primary"]
 .Original
@@ -561,7 +561,7 @@ legacy-let-syntax.nix:1:1: warning[legacy-let-syntax]: legacy 'let { }' syntax; 
 [[lint-empty-inherit]]
 === `empty-inherit`
 
-Severity: warning. An `inherit` with no names.
+Severity: ⚠️ warning. An `inherit` with no names.
 
 [source,nix,role="primary"]
 .Original
@@ -592,7 +592,7 @@ empty-inherit.nix:3:3: warning[empty-inherit]: 'inherit' with no names [fix]
 [[lint-empty-pattern]]
 === `empty-pattern`
 
-Severity: warning. A function taking `{ }`. There is no fix: `_:` would also accept arguments that are not an empty attribute set.
+Severity: ⚠️ warning. A function taking `{ }`. There is no fix: `_:` would also accept arguments that are not an empty attribute set.
 
 [source,nix,role="primary"]
 .Original
@@ -612,7 +612,7 @@ empty-pattern.nix:2:4: warning[empty-pattern]: empty pattern; use '_' if the arg
 [[lint-redundant-pattern-bind]]
 === `redundant-pattern-bind`
 
-Severity: warning. `+{ ... }@x: body+`, which can be written `x: body`.
+Severity: ⚠️ warning. `+{ ... }@x: body+`, which can be written `x: body`.
 
 [source,nix,role="primary"]
 .Original
@@ -644,7 +644,7 @@ redundant-pattern-bind.nix:3:4: warning[redundant-pattern-bind]: '{ ... }@args' 
 [[lint-manual-inherit]]
 === `manual-inherit`
 
-Severity: warning. `a = a;` in an attribute set that is not recursive, which is `inherit a;`.
+Severity: ⚠️ warning. `a = a;` in an attribute set that is not recursive, which is `inherit a;`.
 
 [source,nix,role="primary"]
 .Original
@@ -686,7 +686,7 @@ manual-inherit.nix:4:5: warning[manual-inherit]: 'a = a;' can be written 'inheri
 [[lint-manual-inherit-from]]
 === `manual-inherit-from`
 
-Severity: warning. `a = e.a;`, which is `inherit (e) a;`.
+Severity: ⚠️ warning. `a = e.a;`, which is `inherit (e) a;`.
 
 [source,nix,role="primary"]
 .Original
@@ -728,7 +728,7 @@ manual-inherit-from.nix:6:3: warning[manual-inherit-from]: can be written 'inher
 [[lint-eta-reduction]]
 === `eta-reduction`
 
-Severity: hint. `x: f x`, which is `f` when `f` is a name or an attribute path that does not use `x`.
+Severity: 💡 hint. `x: f x`, which is `f` when `f` is a name or an attribute path that does not use `x`.
 
 [source,nix,role="primary"]
 .Original
@@ -769,7 +769,7 @@ eta-reduction.nix:8:9: hint[eta-reduction]: 'x: f x' can be written 'f' [fix]
 [[lint-useless-parens]]
 === `useless-parens`
 
-Severity: warning. Parentheses around a simple expression, or around a whole binding value, `let` body, interpolation or file.
+Severity: ⚠️ warning. Parentheses around a simple expression, or around a whole binding value, `let` body, interpolation or file.
 
 [source,nix,role="primary"]
 .Original
@@ -828,7 +828,7 @@ useless-parens.nix:13:11: warning[useless-parens]: useless parentheses [fix]
 [[lint-unquoted-uri]]
 === `unquoted-uri`
 
-Severity: warning. A URI literal, which is deprecated. The fix quotes it.
+Severity: ⚠️ warning. A URI literal, which is deprecated. The fix quotes it.
 
 [source,nix,role="primary"]
 .Original
@@ -855,7 +855,7 @@ unquoted-uri.nix:2:9: warning[unquoted-uri]: unquoted URI; URI literals are depr
 [[lint-deprecated-is-null]]
 === `deprecated-is-null`
 
-Severity: warning. `isNull e`, which is `e == null`.
+Severity: ⚠️ warning. `isNull e`, which is `e == null`.
 
 [source,nix,role="primary"]
 .Original
@@ -890,7 +890,7 @@ deprecated-is-null.nix:5:5: warning[deprecated-is-null]: 'isNull' is deprecated;
 [[lint-deprecated-to-path]]
 === `deprecated-to-path`
 
-Severity: warning. `builtins.toPath`, which is deprecated. There is no fix.
+Severity: ⚠️ warning. `builtins.toPath`, which is deprecated. There is no fix.
 
 [source,nix,role="primary"]
 .Original
@@ -923,7 +923,7 @@ deprecated-to-path.nix:4:4: warning[prefixed-builtin]: '__toPath' is 'builtins.t
 [[lint-empty-list-concat]]
 === `empty-list-concat`
 
-Severity: warning. A concatenation with `[ ]`.
+Severity: ⚠️ warning. A concatenation with `[ ]`.
 
 [source,nix,role="primary"]
 .Original
@@ -958,7 +958,7 @@ empty-list-concat.nix:5:4: warning[empty-list-concat]: concatenation with an emp
 [[lint-useless-has-attr]]
 === `useless-has-attr`
 
-Severity: warning. `if x ? a then x.a else d`, which is `x.a or d`.
+Severity: ⚠️ warning. `if x ? a then x.a else d`, which is `x.a or d`.
 
 [source,nix,role="primary"]
 .Original
@@ -992,7 +992,7 @@ useless-has-attr.nix:4:4: warning[useless-has-attr]: can be written 'x.y.a.b or 
 [[lint-faster-builtin]]
 === `faster-builtin`
 
-Severity: hint. `lib.groupBy` and `lib.zipAttrsWith`, which the builtins of the same names implement natively.
+Severity: 💡 hint. `lib.groupBy` and `lib.zipAttrsWith`, which the builtins of the same names implement natively.
 
 [source,nix,role="primary"]
 .Original
@@ -1031,7 +1031,7 @@ faster-builtin.nix:6:14: hint[faster-builtin]: 'lib.groupBy' can be 'builtins.gr
 [[lint-repeated-keys]]
 === `repeated-keys`
 
-Severity: hint. Three or more bindings that start with the same attribute, such as `a.b`, `a.c` and `a.d`, which could form one nested attribute set. There is no fix.
+Severity: 💡 hint. Three or more bindings that start with the same attribute, such as `a.b`, `a.c` and `a.d`, which could form one nested attribute set. There is no fix.
 
 [source,nix,role="primary"]
 .Original
@@ -1058,7 +1058,7 @@ Checks that need name resolution, as https://github.com/nix-community/nixd[nixd]
 [[lint-undefined-variable]]
 === `undefined-variable`
 
-Severity: error. A variable that no binding defines, outside any `with`. Nix rejects the file before evaluating it.
+Severity: ❌ error. A variable that no binding defines, outside any `with`. Nix rejects the file before evaluating it.
 
 [source,nix,role="primary"]
 .Original
@@ -1084,7 +1084,7 @@ undefined-variable.nix:4:3: error[undefined-variable]: undefined variable 'unkno
 [[lint-unknown-builtin]]
 === `unknown-builtin`
 
-Severity: error. `builtins.x` where `x` is not a builtin, unless the file tests `builtins ? x` or gives an `or` fallback.
+Severity: ❌ error. `builtins.x` where `x` is not a builtin, unless the file tests `builtins ? x` or gives an `or` fallback.
 
 [source,nix,role="primary"]
 .Original
@@ -1133,7 +1133,7 @@ unknown-builtin.nix:9:7: warning[shadowed-builtin]: 'builtins' shadows a builtin
 [[lint-prefixed-builtin]]
 === `prefixed-builtin`
 
-Severity: warning. `__x` for the builtin `builtins.x`.
+Severity: ⚠️ warning. `__x` for the builtin `builtins.x`.
 
 [source,nix,role="primary"]
 .Original
@@ -1176,7 +1176,7 @@ prefixed-builtin.nix:8:5: warning[prefixed-builtin]: '__sub' is 'builtins.sub'
 [[lint-shadowed-builtin]]
 === `shadowed-builtin`
 
-Severity: warning. A binding that hides a global such as `map`, `true` or `builtins`. Attributes of a `rec` set and names inherited from an expression are not reported.
+Severity: ⚠️ warning. A binding that hides a global such as `map`, `true` or `builtins`. Attributes of a `rec` set and names inherited from an expression are not reported.
 
 [source,nix,role="primary"]
 .Original
@@ -1207,7 +1207,7 @@ shadowed-builtin.nix:4:3: warning[shadowed-builtin]: 'true' shadows a builtin
 [[lint-extra-rec]]
 === `extra-rec`
 
-Severity: warning. A `rec` attribute set whose attributes never refer to each other.
+Severity: ⚠️ warning. A `rec` attribute set whose attributes never refer to each other.
 
 [source,nix,role="primary"]
 .Original
@@ -1248,7 +1248,7 @@ extra-rec.nix:2:11: warning[extra-rec]: 'rec' is not needed: no attribute refers
 [[lint-extra-with]]
 === `extra-with`
 
-Severity: warning. A `with` that no variable can come from.
+Severity: ⚠️ warning. A `with` that no variable can come from.
 
 [source,nix,role="primary"]
 .Original
@@ -1290,7 +1290,7 @@ Conventions of nixpkgs for derivations.
 [[lint-missing-phase-hooks]]
 === `missing-phase-hooks`
 
-Severity: warning. A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and `postInstall` still work. The fix adds the missing calls to strings of several lines.
+Severity: ⚠️ warning. A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and `postInstall` still work. The fix adds the missing calls to strings of several lines.
 
 [source,nix,role="primary"]
 .Original
@@ -1377,7 +1377,7 @@ missing-phase-hooks.nix:25:3: warning[missing-phase-hooks]: 'fixupPhase' does no
 [[lint-missing-final-attrs]]
 === `missing-final-attrs`
 
-Severity: warning. A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs` also reaches the attributes that use it. The fix rewrites the references to `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs` holds the attributes the builder made, so the fix is only offered when the references are to `pname`, `version` and `src`.
+Severity: ⚠️ warning. A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs` also reaches the attributes that use it. The fix rewrites the references to `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs` holds the attributes the builder made, so the fix is only offered when the references are to `pname`, `version` and `src`.
 
 [source,nix,role="primary"]
 .Original
@@ -1525,7 +1525,7 @@ missing-final-attrs.nix:48:31: warning[extra-rec]: 'rec' is not needed: no attri
 [[lint-missing-structured-attrs]]
 === `missing-structured-attrs`
 
-Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The builders that default it to `true`, such as those for Python, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
+Severity: 💡 hint. A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The builders that default it to `true`, such as those for Python, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
 
 [source,nix,role="primary"]
 .Original
@@ -1655,7 +1655,7 @@ missing-structured-attrs.nix:34:9: hint[missing-strict-deps]: set 'strictDeps = 
 [[lint-missing-strict-deps]]
 === `missing-strict-deps`
 
-Severity: hint. A derivation that does not set `strictDeps`, which nixpkgs expects to be `true` for new packages. The builders that set it already, such as those for Python, Go and Rust, are not reported. The fix adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it changes the build, since tools must then be in `nativeBuildInputs` and libraries in `buildInputs`, so check that the package still builds.
+Severity: 💡 hint. A derivation that does not set `strictDeps`, which nixpkgs expects to be `true` for new packages. The builders that set it already, such as those for Python, Go and Rust, are not reported. The fix adds `strictDeps = true;` after `pname` and `version`, or under `__structuredAttrs`; it changes the build, since tools must then be in `nativeBuildInputs` and libraries in `buildInputs`, so check that the package still builds.
 
 [source,nix,role="primary"]
 .Original
@@ -1780,7 +1780,7 @@ missing-strict-deps.nix:44:12: hint[missing-strict-deps]: set 'strictDeps = true
 [[lint-deprecated-replace]]
 === `deprecated-replace`
 
-Severity: warning. `substituteInPlace` and the other `substitute` functions called with `--replace`, which is deprecated and behaves as `--replace-warn`: a pattern that no longer matches only prints a warning. The fix uses `--replace-fail`, which makes such a build fail instead, so check that the package still builds.
+Severity: ⚠️ warning. `substituteInPlace` and the other `substitute` functions called with `--replace`, which is deprecated and behaves as `--replace-warn`: a pattern that no longer matches only prints a warning. The fix uses `--replace-fail`, which makes such a build fail instead, so check that the package still builds.
 
 [source,nix,role="primary"]
 .Original
@@ -1870,7 +1870,7 @@ deprecated-replace.nix:26:7: warning[deprecated-replace]: '--replace' is depreca
 [[lint-sri-hash]]
 === `sri-hash`
 
-Severity: warning. A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.
+Severity: ⚠️ warning. A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.
 
 [source,nix,role="primary"]
 .Original
@@ -2018,7 +2018,7 @@ sri-hash.nix:42:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sh
 [[lint-env-variable]]
 === `env-variable`
 
-Severity: warning. A `NIX_` variable such as `NIX_CFLAGS_COMPILE` set beside the attributes of a derivation: with `__structuredAttrs`, only `env` is exported, so the compiler wrapper would not see it. The fix moves it to `env`, through `toString` unless it is a string already. It is withheld when `env` is not an attribute set written in place, or the file refers to the variable elsewhere, as `finalAttrs.NIX_LDFLAGS`.
+Severity: ⚠️ warning. A `NIX_` variable such as `NIX_CFLAGS_COMPILE` set beside the attributes of a derivation: with `__structuredAttrs`, only `env` is exported, so the compiler wrapper would not see it. The fix moves it to `env`, through `toString` unless it is a string already. It is withheld when `env` is not an attribute set written in place, or the file refers to the variable elsewhere, as `finalAttrs.NIX_LDFLAGS`.
 
 [source,nix,role="primary"]
 .Original
