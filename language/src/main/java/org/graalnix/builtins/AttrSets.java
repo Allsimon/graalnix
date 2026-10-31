@@ -1,6 +1,7 @@
 package org.graalnix.builtins;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.TreeMap;
 import org.graalnix.runtime.*;
@@ -62,15 +63,23 @@ final class AttrSets {
         b.add("intersectAttrs", 2, a -> {
             NixAttrs x = Types.attrs(a[0]);
             NixAttrs y = Types.attrs(a[1]);
-            List<Integer> keep = new ArrayList<>();
-            if (x.size() < y.size()) {
-                for (String k : x.keys()) {
-                    int j = y.indexOf(k);
-                    if (j >= 0) keep.add(j);
+            if (x.size() < y.minSize()) {
+                String[] xk = x.keys();
+                String[] k = new String[xk.length];
+                Object[] v = new Object[xk.length];
+                var p = new com.oracle.truffle.api.source.SourceSection[xk.length];
+                int n = 0;
+                for (String key : xk) {
+                    Object value = y.getRaw(key);
+                    if (value == null) continue;
+                    k[n] = key;
+                    v[n] = value;
+                    p[n++] = y.position(key);
                 }
-            } else {
-                for (int i = 0; i < y.size(); i++) if (x.has(y.keys()[i])) keep.add(i);
+                return new NixAttrs(Arrays.copyOf(k, n), Arrays.copyOf(v, n), Arrays.copyOf(p, n));
             }
+            List<Integer> keep = new ArrayList<>();
+            for (int i = 0; i < y.size(); i++) if (x.has(y.keys()[i])) keep.add(i);
             return subset(y, keep);
         });
         b.add("catAttrs", 2, a -> {

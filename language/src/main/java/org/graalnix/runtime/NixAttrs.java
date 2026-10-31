@@ -64,6 +64,14 @@ public final class NixAttrs {
         return keys().length;
     }
 
+    /** A lower bound of {@link #size()} that does not merge a union. */
+    public int minSize() {
+        if (leaves == null) return keys.length;
+        int n = 0;
+        for (NixAttrs l : leaves) n = Math.max(n, l.keys.length);
+        return n;
+    }
+
     public boolean isEmpty() {
         return leaves == null && keys.length == 0;
     }
