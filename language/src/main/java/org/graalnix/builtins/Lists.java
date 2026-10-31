@@ -67,7 +67,7 @@ final class Lists {
             return new NixList(out.toArray());
         });
         b.add("elem", 2, a -> {
-            for (Object x : Types.list(a[1]).items) if (Ops.equal(a[0], x)) return true;
+            for (Object x : Types.list(a[1]).items) if (Ops.equalCells(a[0], x)) return true;
             return false;
         });
         b.add("all", 2, a -> {

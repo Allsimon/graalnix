@@ -32,10 +32,3 @@ tvix/eval-okay-builtins-map-propagate-catchable
 tvix/eval-okay-builtins-replace-strings-propagate-catchable
 tvix/eval-okay-toxml-empty
 tvix/eval-okay-xml
-
-# == and list comparison do not follow Nix's value pointer equality
-tvix/eval-okay-observable-eval-cache
-tvix/eval-okay-value-pointer-compare
-tvix/eval-okay-value-pointer-equality
-tvix/eval-fail-cppnix-outer-value-never-pointer-equal
-
