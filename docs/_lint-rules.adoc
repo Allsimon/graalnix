@@ -132,6 +132,10 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 |warning
 |A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and `postInstall` still work. The fix adds the missing calls to strings of several lines.
 
+|<<lint-missing-final-attrs,`missing-final-attrs`>>
+|warning
+|A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs` also reaches the attributes that use it. The fix rewrites the references to `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs` holds the attributes the builder made, so the fix is only offered when the references are to `pname`, `version` and `src`.
+
 |===
 
 == Syntax errors
@@ -1343,4 +1347,132 @@ missing-phase-hooks.nix:6:3: warning[missing-phase-hooks]: 'installPhase' does n
 missing-phase-hooks.nix:12:3: warning[missing-phase-hooks]: 'buildPhase' does not run 'runHook postBuild' [fix]
 missing-phase-hooks.nix:24:3: warning[missing-phase-hooks]: 'configurePhase' does not run 'runHook preConfigure' and 'runHook postConfigure'
 missing-phase-hooks.nix:25:3: warning[missing-phase-hooks]: 'fixupPhase' does not run 'runHook preFixup' and 'runHook postFixup'
+----
+
+[[lint-missing-final-attrs]]
+=== `missing-final-attrs`
+
+Severity: warning. A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs` also reaches the attributes that use it. The fix rewrites the references to `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs` holds the attributes the builder made, so the fix is only offered when the references are to `pname`, `version` and `src`.
+
+[source,nix,role="primary"]
+.Original
+----
+{
+  stdenv,
+  fetchurl,
+  buildPythonPackage,
+  fetchPypi,
+  lib,
+}:
+{
+  hello = stdenv.mkDerivation rec {
+    pname = "hello";
+    version = "2.12";
+    src = fetchurl {
+      url = "mirror://gnu/hello/${pname}-${version}.tar.gz";
+      hash = "sha256-AAAA";
+    };
+    passthru = {
+      inherit lib version;
+    };
+    meta.changelog = "https://example.org/${version}";
+  };
+
+  # Other builders give `finalAttrs` what they made of `meta`, so only `pname`, `version` and `src` are rewritten.
+  python = buildPythonPackage rec {
+    pname = "example";
+    version = "1.0";
+    src = fetchPypi { inherit pname version; };
+    passthru.homepage = meta.homepage;
+    meta.homepage = "https://example.org";
+  };
+
+  fixable = buildPythonPackage rec {
+    pname = "other";
+    version = "2.0";
+    src = fetchPypi { inherit pname version; };
+  };
+
+  # Not fixed: the inner `finalAttrs` would capture `pname` and `version`.
+  nested = stdenv.mkDerivation rec {
+    pname = "nested";
+    version = "1.0";
+    modules = stdenv.mkDerivation (finalAttrs: {
+      pname = "${pname}-modules";
+      inherit version;
+    });
+  };
+
+  # Left to `extra-rec`: no attribute refers to another.
+  plain = stdenv.mkDerivation rec {
+    pname = "plain";
+  };
+}
+----
+
+[source,nix,role="secondary"]
+.Fixed
+----
+{
+  stdenv,
+  fetchurl,
+  buildPythonPackage,
+  fetchPypi,
+  lib,
+}:
+{
+  hello = stdenv.mkDerivation (finalAttrs: {
+    pname = "hello";
+    version = "2.12";
+    src = fetchurl {
+      url = "mirror://gnu/hello/${finalAttrs.pname}-${finalAttrs.version}.tar.gz";
+      hash = "sha256-AAAA";
+    };
+    passthru = {
+      inherit lib; inherit (finalAttrs) version;
+    };
+    meta.changelog = "https://example.org/${finalAttrs.version}";
+  });
+
+  # Other builders give `finalAttrs` what they made of `meta`, so only `pname`, `version` and `src` are rewritten.
+  python = buildPythonPackage rec {
+    pname = "example";
+    version = "1.0";
+    src = fetchPypi { inherit pname version; };
+    passthru.homepage = meta.homepage;
+    meta.homepage = "https://example.org";
+  };
+
+  fixable = buildPythonPackage (finalAttrs: {
+    pname = "other";
+    version = "2.0";
+    src = fetchPypi { inherit (finalAttrs) pname version; };
+  });
+
+  # Not fixed: the inner `finalAttrs` would capture `pname` and `version`.
+  nested = stdenv.mkDerivation (finalAttrs: {
+    pname = "nested";
+    version = "1.0";
+    modules = stdenv.mkDerivation (_: {
+      pname = "${finalAttrs.pname}-modules";
+      inherit (finalAttrs) version;
+    });
+  });
+
+  # Left to `extra-rec`: no attribute refers to another.
+  plain = stdenv.mkDerivation {
+    pname = "plain";
+  };
+}
+----
+
+[source,text,role="secondary"]
+.Diagnostics
+----
+missing-final-attrs.nix:9:31: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }' [fix]
+missing-final-attrs.nix:23:31: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }'
+missing-final-attrs.nix:31:32: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }' [fix]
+missing-final-attrs.nix:38:32: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }'
+missing-final-attrs.nix:41:36: warning[unused-lambda-arg]: unused lambda argument 'finalAttrs' [fix]
+missing-final-attrs.nix:48:31: warning[extra-rec]: 'rec' is not needed: no attribute refers to another [fix]
 ----

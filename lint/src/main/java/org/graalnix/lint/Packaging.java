@@ -2,7 +2,9 @@ package org.graalnix.lint;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.graalnix.parser.Syntax.*;
 import org.graalnix.parser.TokenType;
@@ -23,8 +25,24 @@ final class Packaging {
             "installCheckPhase", "InstallCheck",
             "distPhase", "Dist");
 
+    /** Builders other than {@code stdenv.mkDerivation} that nixpkgs calls with {@code finalAttrs:}. */
+    private static final Set<String> BUILDERS = Set.of(
+            "buildDotnetModule",
+            "buildDunePackage",
+            "buildGoModule",
+            "buildHomeAssistantComponent",
+            "buildMavenPackage",
+            "buildNpmPackage",
+            "buildPythonApplication",
+            "buildPythonPackage",
+            "buildRustPackage");
+
+    /** The attributes that these builders pass on unchanged in {@code finalAttrs}. */
+    private static final Set<String> KEPT = Set.of("pname", "version", "src");
+
     static void check(String src, Scope scope, List<Diagnostic> out) {
         for (Node n : scope.nodes) {
+            if (n instanceof Call c && c.args().getLast() instanceof AttrSet s) finalAttrs(src, scope, c, s, out);
             if (!(n instanceof AttrSet s)) continue;
             for (Binding b : s.binds()) {
                 if (b instanceof Assign a
@@ -34,6 +52,92 @@ final class Packaging {
                         && a.value() instanceof Str str) phase(src, name, hook, str, out);
             }
         }
+    }
+
+    private static void finalAttrs(String src, Scope scope, Call call, AttrSet set, List<Diagnostic> out) {
+        if (set.rec() == null || set.rec().type() != TokenType.REC) return;
+        Boolean stdenv = builder(call.fn());
+        if (stdenv == null) return;
+        List<Scope.Def> defs = scope.owned.getOrDefault(set, List.of());
+        if (defs.stream().allMatch(d -> d.uses.isEmpty())) return;
+        int start = Nodes.start(set);
+        int end = Nodes.end(set);
+        List<Edit> edits = new ArrayList<>();
+        edits.add(new Edit(set.rec().start(), set.rec().end(), "(finalAttrs:"));
+        edits.add(new Edit(end, end, ")"));
+        boolean fixable = true;
+        for (Node n : scope.nodes) {
+            if (!(n instanceof Ident i) || Nodes.start(i) < start || Nodes.end(i) > end) continue;
+            Scope.Def d = scope.resolved.get(i);
+            if (d != null && defs.contains(d)) {
+                fixable &= stdenv || KEPT.contains(d.name);
+                edits.add(new Edit(Nodes.start(i), Nodes.end(i), "finalAttrs." + d.name));
+            } else if (Scope.name(i).equals("finalAttrs")) {
+                // The new argument would capture it.
+                fixable &= d != null && Nodes.start(d.owner) >= start && Nodes.end(d.owner) <= end;
+            }
+        }
+        for (Node n : scope.nodes) {
+            if (Nodes.start(n) < start || Nodes.end(n) > end) continue;
+            if (n instanceof AttrSet inner) fixable &= inherits(src, scope, inner.binds(), defs, stdenv, edits);
+            if (n instanceof Let l) fixable &= inherits(src, scope, l.binds(), defs, stdenv, edits);
+        }
+        // A `finalAttrs` bound inside the set, as by a nested `mkDerivation (finalAttrs: ...)`, would capture the
+        // references rewritten below it.
+        for (Scope.Def d : scope.defs) {
+            if (!d.name.equals("finalAttrs") || Nodes.start(d.owner) < start || Nodes.end(d.owner) > end) continue;
+            for (Edit e : edits.subList(2, edits.size())) {
+                if (Nodes.start(d.owner) <= e.start() && e.end() <= Nodes.end(d.owner)) fixable = false;
+            }
+        }
+        out.add(new Diagnostic(
+                Rule.MISSING_FINAL_ATTRS,
+                set.rec().start(),
+                set.open().end(),
+                "use 'finalAttrs: { ... }' instead of 'rec { ... }'",
+                fixable ? edits : List.of()));
+    }
+
+    /**
+     * Whether {@code fn} is a builder that takes {@code finalAttrs:}: true for {@code stdenv.mkDerivation} and its
+     * variants, false for the other builders, null otherwise.
+     */
+    private static Boolean builder(Node fn) {
+        if (fn instanceof Ident i) return BUILDERS.contains(Scope.name(i)) ? false : null;
+        if (!(fn instanceof Select s) || s.fallback() != null) return null;
+        String name = Nodes.staticName(s.path().getLast().attr());
+        if (BUILDERS.contains(name)) return false;
+        if (!"mkDerivation".equals(name)) return null;
+        String owner = s.path().size() > 1
+                ? Nodes.staticName(s.path().get(s.path().size() - 2).attr())
+                : s.target() instanceof Ident t ? Scope.name(t) : null;
+        return owner != null && owner.toLowerCase(Locale.ROOT).contains("stdenv") ? true : null;
+    }
+
+    /** Turns the names of plain {@code inherit} that come from the set into {@code inherit (finalAttrs)}. */
+    private static boolean inherits(
+            String src, Scope scope, List<Binding> binds, List<Scope.Def> defs, boolean stdenv, List<Edit> edits) {
+        boolean fixable = true;
+        for (Binding b : binds) {
+            if (!(b instanceof Inherit inh) || inh.from() != null) continue;
+            List<String> kept = new ArrayList<>();
+            List<String> moved = new ArrayList<>();
+            for (AttrNode a : inh.names()) {
+                Scope.Def d = scope.inherited.get(a);
+                String text = src.substring(Nodes.attrStart(a), Nodes.attrEnd(a));
+                if (d != null && defs.contains(d)) {
+                    fixable &= stdenv || KEPT.contains(d.name);
+                    moved.add(text);
+                } else {
+                    kept.add(text);
+                }
+            }
+            if (moved.isEmpty()) continue;
+            String text = "inherit (finalAttrs) " + String.join(" ", moved) + ";";
+            if (!kept.isEmpty()) text = "inherit " + String.join(" ", kept) + "; " + text;
+            edits.add(new Edit(inh.inherit().start(), inh.semi().end(), text));
+        }
+        return fixable;
     }
 
     private static void phase(String src, Ident name, String hook, Str str, List<Diagnostic> out) {

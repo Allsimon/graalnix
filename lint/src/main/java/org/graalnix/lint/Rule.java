@@ -79,7 +79,15 @@ public enum Rule {
             WARNING,
             "A phase such as `installPhase` set to a string that does not run its hooks: nixpkgs expects"
                     + " `runHook preInstall` first and `runHook postInstall` last, so that `preInstall` and"
-                    + " `postInstall` still work. The fix adds the missing calls to strings of several lines.");
+                    + " `postInstall` still work. The fix adds the missing calls to strings of several lines."),
+    MISSING_FINAL_ATTRS(
+            WARNING,
+            "A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation"
+                    + " rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs`"
+                    + " also reaches the attributes that use it. The fix rewrites the references to"
+                    + " `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs`"
+                    + " holds the attributes the builder made, so the fix is only offered when the references are to"
+                    + " `pname`, `version` and `src`.");
 
     private final Severity severity;
     private final String description;
