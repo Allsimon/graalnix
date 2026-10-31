@@ -87,7 +87,13 @@ public enum Rule {
                     + " also reaches the attributes that use it. The fix rewrites the references to"
                     + " `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs`"
                     + " holds the attributes the builder made, so the fix is only offered when the references are to"
-                    + " `pname`, `version` and `src`.");
+                    + " `pname`, `version` and `src`."),
+    MISSING_STRUCTURED_ATTRS(
+            HINT,
+            "A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages."
+                    + " The Python builders, which default to `true`, are not reported. The fix adds"
+                    + " `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases"
+                    + " then see lists as Bash arrays, so check that the package still builds.");
 
     private final Severity severity;
     private final String description;

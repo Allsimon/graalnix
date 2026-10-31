@@ -3,6 +3,8 @@ stdenv.mkDerivation {
   pname = "example";
   version = "1.0";
 
+  __structuredAttrs = true;
+
   installPhase = ''
     runHook preInstall
 

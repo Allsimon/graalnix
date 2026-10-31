@@ -37,12 +37,19 @@ final class Packaging {
             "buildPythonPackage",
             "buildRustPackage");
 
+    /** The builders whose {@code __structuredAttrs} defaults to true. */
+    private static final Set<String> STRUCTURED = Set.of("buildPythonApplication", "buildPythonPackage");
+
     /** The attributes that these builders pass on unchanged in {@code finalAttrs}. */
     private static final Set<String> KEPT = Set.of("pname", "version", "src");
+
+    /** The attributes that name a package, which {@code __structuredAttrs} goes after. */
+    private static final Set<String> IDENTITY = Set.of("pname", "version", "name");
 
     static void check(String src, Scope scope, List<Diagnostic> out) {
         for (Node n : scope.nodes) {
             if (n instanceof Call c && c.args().getLast() instanceof AttrSet s) finalAttrs(src, scope, c, s, out);
+            if (n instanceof Call c) structuredAttrs(src, c, out);
             if (!(n instanceof AttrSet s)) continue;
             for (Binding b : s.binds()) {
                 if (b instanceof Assign a
@@ -98,6 +105,66 @@ final class Packaging {
                 fixable ? edits : List.of()));
     }
 
+    private static void structuredAttrs(String src, Call call, List<Diagnostic> out) {
+        if (builder(call.fn()) == null || STRUCTURED.contains(name(call.fn()))) return;
+        AttrSet set = switch (call.args().getLast()) {
+            case AttrSet s -> s;
+            case Paren p when p.expr() instanceof Lambda l && l.body() instanceof AttrSet s -> s;
+            default -> null;
+        };
+        if (set == null || set.rec() != null && set.rec().type() == TokenType.LET) return;
+        for (Binding b : set.binds()) if (names(b).contains("__structuredAttrs")) return;
+        Binding after = null;
+        for (Binding b : set.binds()) {
+            if (!names(b).stream().allMatch(n -> n != null && IDENTITY.contains(n))
+                    || b instanceof Assign a && a.path().size() > 1) break;
+            after = b;
+        }
+        out.add(new Diagnostic(
+                Rule.MISSING_STRUCTURED_ATTRS,
+                Nodes.start(call.fn()),
+                Nodes.end(call.fn()),
+                "set '__structuredAttrs = true;'",
+                structuredFix(src, set, after)));
+    }
+
+    /**
+     * Inserts the attribute on a line of its own, after the leading {@code pname}, {@code version} or {@code name}
+     * bindings, else at the top of the set, with the indentation of the bindings.
+     */
+    private static List<Edit> structuredFix(String src, AttrSet set, Binding after) {
+        if (set.binds().isEmpty()) return List.of();
+        Binding first = set.binds().getFirst();
+        int lineStart = src.lastIndexOf('\n', Nodes.start(first) - 1) + 1;
+        String indent = src.substring(lineStart, Nodes.start(first));
+        if (!indent.isBlank()) return List.of();
+        String attr = "__structuredAttrs = true;";
+        if (after == null) {
+            // Right after the brace, so that a comment on the first binding stays with it.
+            int line = src.indexOf('\n', set.open().end());
+            if (line < 0 || !src.substring(set.open().end(), line).isBlank()) return List.of();
+            return List.of(new Edit(line + 1, line + 1, indent + attr + "\n\n"));
+        }
+        int end = Nodes.end(after);
+        if (end < src.length() && src.charAt(end) != '\n') return List.of();
+        return List.of(new Edit(end, end, "\n\n" + indent + attr));
+    }
+
+    /** The name a builder is called by, once {@link #builder} has recognized it. */
+    private static String name(Node fn) {
+        return fn instanceof Select s ? Nodes.staticName(s.path().getLast().attr()) : Scope.name((Ident) fn);
+    }
+
+    /** The attributes a binding sets: the first of its path, or the names it inherits. */
+    private static List<String> names(Binding b) {
+        return switch (b) {
+            case Assign a ->
+                java.util.Collections.singletonList(
+                        Nodes.staticName(a.path().getFirst().attr()));
+            case Inherit inh -> inh.names().stream().map(Nodes::staticName).toList();
+        };
+    }
+
     /**
      * Whether {@code fn} is a builder that takes {@code finalAttrs:}: true for {@code stdenv.mkDerivation} and its
      * variants, false for the other builders, null otherwise.
@@ -106,6 +173,7 @@ final class Packaging {
         if (fn instanceof Ident i) return BUILDERS.contains(Scope.name(i)) ? false : null;
         if (!(fn instanceof Select s) || s.fallback() != null) return null;
         String name = Nodes.staticName(s.path().getLast().attr());
+        if (name == null) return null;
         if (BUILDERS.contains(name)) return false;
         if (!"mkDerivation".equals(name)) return null;
         String owner = s.path().size() > 1

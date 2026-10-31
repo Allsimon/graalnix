@@ -136,6 +136,10 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 |warning
 |A derivation built from a `rec` set whose attributes refer to each other, such as `+stdenv.mkDerivation rec { ... }+`. With `+finalAttrs: { ... }+`, an override of `version` through `overrideAttrs` also reaches the attributes that use it. The fix rewrites the references to `finalAttrs.version` and the like. For builders other than `stdenv.mkDerivation`, `finalAttrs` holds the attributes the builder made, so the fix is only offered when the references are to `pname`, `version` and `src`.
 
+|<<lint-missing-structured-attrs,`missing-structured-attrs`>>
+|hint
+|A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The Python builders, which default to `true`, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
+
 |===
 
 == Syntax errors
@@ -1311,6 +1315,8 @@ stdenv.mkDerivation {
   pname = "example";
   version = "1.0";
 
+  __structuredAttrs = true;
+
   installPhase = ''
     runHook preInstall
 
@@ -1343,6 +1349,7 @@ stdenv.mkDerivation {
 [source,text,role="secondary"]
 .Diagnostics
 ----
+missing-phase-hooks.nix:2:1: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
 missing-phase-hooks.nix:6:3: warning[missing-phase-hooks]: 'installPhase' does not run 'runHook preInstall' and 'runHook postInstall' [fix]
 missing-phase-hooks.nix:12:3: warning[missing-phase-hooks]: 'buildPhase' does not run 'runHook postBuild' [fix]
 missing-phase-hooks.nix:24:3: warning[missing-phase-hooks]: 'configurePhase' does not run 'runHook preConfigure' and 'runHook postConfigure'
@@ -1424,6 +1431,8 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
   hello = stdenv.mkDerivation (finalAttrs: {
     pname = "hello";
     version = "2.12";
+
+    __structuredAttrs = true;
     src = fetchurl {
       url = "mirror://gnu/hello/${finalAttrs.pname}-${finalAttrs.version}.tar.gz";
       hash = "sha256-AAAA";
@@ -1453,15 +1462,21 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
   nested = stdenv.mkDerivation (finalAttrs: {
     pname = "nested";
     version = "1.0";
+
+    __structuredAttrs = true;
     modules = stdenv.mkDerivation (_: {
       pname = "${finalAttrs.pname}-modules";
       inherit (finalAttrs) version;
+
+      __structuredAttrs = true;
     });
   });
 
   # Left to `extra-rec`: no attribute refers to another.
   plain = stdenv.mkDerivation {
     pname = "plain";
+
+    __structuredAttrs = true;
   };
 }
 ----
@@ -1469,10 +1484,127 @@ Severity: warning. A derivation built from a `rec` set whose attributes refer to
 [source,text,role="secondary"]
 .Diagnostics
 ----
+missing-final-attrs.nix:9:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
 missing-final-attrs.nix:9:31: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }' [fix]
 missing-final-attrs.nix:23:31: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }'
 missing-final-attrs.nix:31:32: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }' [fix]
+missing-final-attrs.nix:38:12: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
 missing-final-attrs.nix:38:32: warning[missing-final-attrs]: use 'finalAttrs: { ... }' instead of 'rec { ... }'
+missing-final-attrs.nix:41:15: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
 missing-final-attrs.nix:41:36: warning[unused-lambda-arg]: unused lambda argument 'finalAttrs' [fix]
+missing-final-attrs.nix:48:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
 missing-final-attrs.nix:48:31: warning[extra-rec]: 'rec' is not needed: no attribute refers to another [fix]
+----
+
+[[lint-missing-structured-attrs]]
+=== `missing-structured-attrs`
+
+Severity: hint. A derivation that does not set `__structuredAttrs`, which nixpkgs expects to be `true` for new packages. The Python builders, which default to `true`, are not reported. The fix adds `__structuredAttrs = true;` after `pname` and `version`; it changes the build, since phases then see lists as Bash arrays, so check that the package still builds.
+
+[source,nix,role="primary"]
+.Original
+----
+{
+  stdenv,
+  buildGoModule,
+  buildPythonPackage,
+  pname,
+  version,
+}:
+{
+  plain = stdenv.mkDerivation {
+    pname = "plain";
+    version = "1.0";
+
+    strictDeps = true;
+  };
+
+  final = stdenv.mkDerivation (finalAttrs: {
+    inherit pname version;
+    meta.description = "${finalAttrs.pname} example";
+  });
+
+  go = buildGoModule {
+    # The comment stays with `src`.
+    src = ./.;
+    vendorHash = null;
+  };
+
+  set = stdenv.mkDerivation {
+    pname = "set";
+    __structuredAttrs = true;
+  };
+
+  # Deliberately off.
+  off = stdenv.mkDerivation {
+    pname = "off";
+    __structuredAttrs = false;
+  };
+
+  # Defaults to `true`.
+  python = buildPythonPackage {
+    inherit pname version;
+  };
+}
+----
+
+[source,nix,role="secondary"]
+.Fixed
+----
+{
+  stdenv,
+  buildGoModule,
+  buildPythonPackage,
+  pname,
+  version,
+}:
+{
+  plain = stdenv.mkDerivation {
+    pname = "plain";
+    version = "1.0";
+
+    __structuredAttrs = true;
+
+    strictDeps = true;
+  };
+
+  final = stdenv.mkDerivation (finalAttrs: {
+    inherit pname version;
+
+    __structuredAttrs = true;
+    meta.description = "${finalAttrs.pname} example";
+  });
+
+  go = buildGoModule {
+    __structuredAttrs = true;
+
+    # The comment stays with `src`.
+    src = ./.;
+    vendorHash = null;
+  };
+
+  set = stdenv.mkDerivation {
+    pname = "set";
+    __structuredAttrs = true;
+  };
+
+  # Deliberately off.
+  off = stdenv.mkDerivation {
+    pname = "off";
+    __structuredAttrs = false;
+  };
+
+  # Defaults to `true`.
+  python = buildPythonPackage {
+    inherit pname version;
+  };
+}
+----
+
+[source,text,role="secondary"]
+.Diagnostics
+----
+missing-structured-attrs.nix:9:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:16:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:21:8: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
 ----
