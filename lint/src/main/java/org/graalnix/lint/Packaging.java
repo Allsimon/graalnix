@@ -42,6 +42,7 @@ final class Packaging {
             if (n instanceof Call c && c.args().getLast() instanceof AttrSet s) finalAttrs(src, scope, c, s, out);
             if (n instanceof Str str) replace(src, str, out);
             if (n instanceof Call c) sriHash(src, scope, c, out);
+            if (n instanceof Call c) env(src, scope, c, out);
             if (n instanceof Call c) {
                 flag(src, c, Rule.MISSING_STRUCTURED_ATTRS, "__structuredAttrs", Builders.STRUCTURED_ATTRS, out);
                 flag(src, c, Rule.MISSING_STRICT_DEPS, "strictDeps", Builders.STRICT_DEPS, out);
@@ -105,12 +106,8 @@ final class Packaging {
     private static void flag(
             String src, Call call, Rule rule, String attr, Set<String> defaults, List<Diagnostic> out) {
         if (builder(call.fn()) == null || defaults.contains(name(call.fn()))) return;
-        AttrSet set = switch (call.args().getLast()) {
-            case AttrSet s -> s;
-            case Paren p when p.expr() instanceof Lambda l && l.body() instanceof AttrSet s -> s;
-            default -> null;
-        };
-        if (set == null || set.rec() != null && set.rec().type() == TokenType.LET) return;
+        AttrSet set = derivation(call);
+        if (set == null) return;
         for (Binding b : set.binds()) if (names(b).contains(attr)) return;
         out.add(new Diagnostic(
                 rule,
@@ -207,6 +204,94 @@ final class Packaging {
             edits.add(new Edit(inh.inherit().start(), inh.semi().end(), text));
         }
         return fixable;
+    }
+
+    /** The attribute set a builder is called with, as {@code { }}, {@code rec { }} or {@code finalAttrs: { }}. */
+    private static AttrSet derivation(Call call) {
+        if (builder(call.fn()) == null) return null;
+        AttrSet set = switch (call.args().getLast()) {
+            case AttrSet s -> s;
+            case Paren p when p.expr() instanceof Lambda l && l.body() instanceof AttrSet s -> s;
+            default -> null;
+        };
+        return set == null || set.rec() != null && set.rec().type() == TokenType.LET ? null : set;
+    }
+
+    /** The functions whose result is a string, which {@code env} takes as it is. */
+    private static final Set<String> STRINGS =
+            Set.of("concatMapStringsSep", "concatStringsSep", "escapeShellArgs", "optionalString", "toString");
+
+    /** Reports a {@code NIX_} variable set beside the attributes of a derivation rather than in its {@code env}. */
+    private static void env(String src, Scope scope, Call call, List<Diagnostic> out) {
+        AttrSet set = derivation(call);
+        if (set == null) return;
+        Set<String> inEnv = new java.util.HashSet<>();
+        boolean envFixable = true;
+        for (Binding b : set.binds()) {
+            if (!names(b).contains("env")) continue;
+            if (b instanceof Assign a && a.path().size() > 1) {
+                inEnv.add(Nodes.staticName(a.path().get(1).attr()));
+            } else if (b instanceof Assign a && a.value() instanceof AttrSet e && e.rec() == null) {
+                for (Binding eb : e.binds()) inEnv.addAll(names(eb));
+            } else {
+                envFixable = false;
+            }
+        }
+        for (Binding b : set.binds()) {
+            if (!(b instanceof Assign a) || a.path().size() != 1) continue;
+            String name = names(b).getFirst();
+            if (name == null || !name.startsWith("NIX_")) continue;
+            AttrNode attr = a.path().getFirst().attr();
+            boolean fixable = envFixable && !inEnv.contains(name) && !referred(src, scope, set, name);
+            List<Edit> fix = !fixable
+                    ? List.of()
+                    : List.of(
+                            new Edit(Nodes.attrStart(attr), Nodes.attrStart(attr), "env."),
+                            new Edit(Nodes.start(a.value()), Nodes.end(a.value()), envValue(src, a.value())));
+            out.add(new Diagnostic(
+                    Rule.ENV_VARIABLE,
+                    Nodes.attrStart(attr),
+                    Nodes.attrEnd(attr),
+                    "set '" + name + "' in 'env', or it is not exported with __structuredAttrs",
+                    fix));
+        }
+    }
+
+    /** Whether the file refers to the attribute {@code name}, as in {@code finalAttrs.NIX_LDFLAGS}. */
+    private static boolean referred(String src, Scope scope, AttrSet set, String name) {
+        if (scope.owned.getOrDefault(set, List.of()).stream().anyMatch(d -> d.name.equals(name) && !d.uses.isEmpty()))
+            return true;
+        // An attribute access; shell code such as export NIX_LDFLAGS+=... works the same from env.
+        for (int i = src.indexOf(name); i >= 0; i = src.indexOf(name, i + 1)) {
+            if (i > 0 && src.charAt(i - 1) == '.') return true;
+        }
+        return false;
+    }
+
+    /** The value as {@code env} takes it: anything but a string, number or boolean goes through toString. */
+    private static String envValue(String src, Node v) {
+        String text = Nodes.text(src, v);
+        if (envReady(v)) return text;
+        return "toString " + (Nodes.prec(v) >= Nodes.ATOM || v instanceof ListExpr ? text : "(" + text + ")");
+    }
+
+    /** Whether {@code v} is a value {@code env} takes as it is, as far as the syntax tells. */
+    private static boolean envReady(Node v) {
+        return switch (v) {
+            case Str s -> true;
+            case IntLit i -> true;
+            case Ident i -> Scope.name(i).equals("true") || Scope.name(i).equals("false");
+            case BinOp b when b.op().type() == TokenType.PLUS -> envReady(b.left()) || envReady(b.right());
+            case Call c -> {
+                String fn = switch (c.fn()) {
+                    case Ident i -> Scope.name(i);
+                    case Select s -> Nodes.staticName(s.path().getLast().attr());
+                    default -> null;
+                };
+                yield fn != null && STRINGS.contains(fn);
+            }
+            default -> false;
+        };
     }
 
     /** Reports {@code sha256} given to a fetcher that takes {@code hash}, and converts its value to SRI. */

@@ -111,7 +111,14 @@ public enum Rule {
             WARNING,
             "A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix"
                     + " renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes"
-                    + " `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.");
+                    + " `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported."),
+    ENV_VARIABLE(
+            WARNING,
+            "A `NIX_` variable such as `NIX_CFLAGS_COMPILE` set beside the attributes of a derivation: with"
+                    + " `__structuredAttrs`, only `env` is exported, so the compiler wrapper would not see it. The"
+                    + " fix moves it to `env`, through `toString` unless it is a string already. It is withheld when"
+                    + " `env` is not an attribute set written in place, or the file refers to the variable"
+                    + " elsewhere, as `finalAttrs.NIX_LDFLAGS`.");
 
     private final Severity severity;
     private final String description;
