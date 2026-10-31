@@ -1,0 +1,3 @@
+missing-structured-attrs.nix:9:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:16:11: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
+missing-structured-attrs.nix:21:8: hint[missing-structured-attrs]: set '__structuredAttrs = true;' [fix]
