@@ -11,11 +11,13 @@ import org.graalnix.NixContext;
 import org.graalnix.runtime.*;
 
 public final class Json {
-    private final StringBuilder out = new StringBuilder();
-    private final Set<String> context = new TreeSet<>();
+    private final StringBuilder out;
+    private final Set<String> context;
     private final boolean copyToStore;
 
-    private Json(boolean copyToStore) {
+    private Json(StringBuilder out, Set<String> context, boolean copyToStore) {
+        this.out = out;
+        this.context = context;
         this.copyToStore = copyToStore;
     }
 
@@ -26,9 +28,15 @@ public final class Json {
 
     /** Port of {@code printValueAsJSON}. */
     public static NixString toJson(Object v, boolean copyToStore) {
-        Json j = new Json(copyToStore);
-        j.value(v);
-        return new NixString(j.out.toString(), j.context);
+        StringBuilder out = new StringBuilder();
+        Set<String> context = new TreeSet<>();
+        write(out, context, v, copyToStore);
+        return new NixString(out.toString(), context);
+    }
+
+    /** Appends the JSON of {@code v} to {@code out}, and its string context to {@code context}. */
+    static void write(StringBuilder out, Set<String> context, Object v, boolean copyToStore) {
+        new Json(out, context, copyToStore).value(v);
     }
 
     private void value(Object v) {
@@ -98,6 +106,10 @@ public final class Json {
     }
 
     private void string(String s) {
+        quote(out, s);
+    }
+
+    static void quote(StringBuilder out, String s) {
         out.append('"');
         int start = 0;
         for (int i = 0; i < s.length(); i++) {

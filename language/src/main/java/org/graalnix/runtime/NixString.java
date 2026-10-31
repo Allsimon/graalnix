@@ -27,6 +27,8 @@ public final class NixString {
     public static Set<String> merge(Set<String> a, Set<String> b) {
         if (a == null) return b;
         if (b == null) return a;
+        if (a.containsAll(b)) return a;
+        if (b.containsAll(a)) return b;
         TreeSet<String> r = new TreeSet<>(a);
         r.addAll(b);
         return r;

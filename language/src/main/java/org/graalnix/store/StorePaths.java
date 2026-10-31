@@ -20,7 +20,11 @@ public final class StorePaths {
     }
 
     public static String text(String storeDir, String name, String contents, Collection<String> refs) {
-        return make(storeDir, withRefs("text", refs, false), Hashes.sha256(contents), name);
+        return text(storeDir, name, Hashes.sha256(contents), refs);
+    }
+
+    public static String text(String storeDir, String name, byte[] contentsSha256, Collection<String> refs) {
+        return make(storeDir, withRefs("text", refs, false), contentsSha256, name);
     }
 
     /** A path added recursively with SHA-256, e.g. by path interpolation. */

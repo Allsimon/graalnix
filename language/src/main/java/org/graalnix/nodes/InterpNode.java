@@ -1,5 +1,6 @@
 package org.graalnix.nodes;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.ExplodeLoop;
 import java.util.Set;
@@ -23,15 +24,24 @@ public final class InterpNode extends NixNode {
     @Override
     @ExplodeLoop
     public Object execute(VirtualFrame frame) {
-        StringBuilder sb = new StringBuilder();
-        Set<String> ctx = null;
+        Object[] strings = new Object[parts.length];
         for (int i = 0; i < parts.length; i++) {
             Object v = parts[i].execute(frame);
+            strings[i] = isPath && i == 0 ? v : Coerce.toNixString(v, false, !isPath);
+        }
+        return concat(strings);
+    }
+
+    @TruffleBoundary
+    private Object concat(Object[] strings) {
+        StringBuilder sb = new StringBuilder();
+        Set<String> ctx = null;
+        for (int i = 0; i < strings.length; i++) {
             if (isPath && i == 0) {
-                sb.append(((NixPath) v).path());
+                sb.append(((NixPath) strings[i]).path());
                 continue;
             }
-            NixString s = Coerce.toNixString(v, false, !isPath);
+            NixString s = (NixString) strings[i];
             sb.append(s.value);
             ctx = NixString.merge(ctx, s.context);
         }

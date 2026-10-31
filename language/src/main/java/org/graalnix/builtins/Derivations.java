@@ -41,6 +41,8 @@ public final class Derivations {
 
     private static final Map<String, Map<String, byte[]>> HASH_MODULO = new HashMap<>();
 
+    private static final AtermWriter ATERM = new AtermWriter(Hashes.digest("sha256"));
+
     static void register(Builtins b) {
         NixContext ctx = b.ctx;
         b.add("derivationStrict", 1, a -> derivationStrict(ctx, Types.attrs(a[0])));
@@ -111,12 +113,10 @@ public final class Derivations {
             }
             if (structured) {
                 if (key.equals("__structuredAttrs")) continue;
-                NixString s = Json.toJson(v, true);
-                if (s.context != null) context.addAll(s.context);
                 if (json.length() > 1) json.append(',');
-                json.append(Json.toJson(new NixString(key), false).value)
-                        .append(':')
-                        .append(s.value);
+                Json.quote(json, key);
+                json.append(':');
+                Json.write(json, context, v, true);
                 switch (key) {
                     case "builder" -> drv.builder = stringOf(v, context);
                     case "system" -> drv.platform = stringOf(v, context);
@@ -193,7 +193,7 @@ public final class Derivations {
 
         TreeSet<String> refs = new TreeSet<>(drv.inputSrcs);
         refs.addAll(drv.inputDrvs.keySet());
-        String drvPath = StorePaths.text(ctx.storeDir, drvName + ".drv", unparse(drv, false, null), refs);
+        String drvPath = StorePaths.text(ctx.storeDir, drvName + ".drv", atermHash(drv, false, null), refs);
         DRVS.put(drvPath, drv);
 
         TreeMap<String, Object> result = new TreeMap<>();
@@ -248,7 +248,7 @@ public final class Derivations {
                 inputs.computeIfAbsent(Hashes.hex(oh), k -> new TreeSet<>()).add(o);
             }
         }
-        byte[] hash = Hashes.sha256(unparse(drv, mask, inputs));
+        byte[] hash = atermHash(drv, mask, inputs);
         for (String o : drv.outputs.keySet()) out.put(o, hash);
         return out;
     }
@@ -265,90 +265,72 @@ public final class Derivations {
     }
 
     /** ATerm serialisation, as {@code Derivation::unparse}. */
-    static String unparse(Drv drv, boolean mask, TreeMap<String, TreeSet<String>> actualInputs) {
-        StringBuilder s = new StringBuilder("Derive([");
+    static void unparse(AtermWriter w, Drv drv, boolean mask, TreeMap<String, TreeSet<String>> actualInputs) {
+        for (char c : "Derive([".toCharArray()) w.put(c);
         boolean first = true;
         for (var e : drv.outputs.entrySet()) {
-            if (!first) s.append(',');
+            if (!first) w.put(',');
             first = false;
             Output o = e.getValue();
-            s.append('(');
-            raw(s, e.getKey()).append(',');
-            raw(s, mask ? "" : o.path()).append(',');
-            raw(s, o.hashAlgo()).append(',');
-            raw(s, o.hash()).append(')');
+            w.put('(').raw(e.getKey()).put(',');
+            w.raw(mask ? "" : o.path()).put(',');
+            w.raw(o.hashAlgo()).put(',');
+            w.raw(o.hash()).put(')');
         }
-        s.append("],[");
+        w.put(']').put(',').put('[');
         first = true;
         for (var e : (actualInputs != null ? actualInputs : drv.inputDrvs).entrySet()) {
-            if (!first) s.append(',');
+            if (!first) w.put(',');
             first = false;
-            s.append('(');
-            raw(s, e.getKey()).append(",[");
+            w.put('(').raw(e.getKey()).put(',').put('[');
             boolean f2 = true;
             for (String o : e.getValue()) {
-                if (!f2) s.append(',');
+                if (!f2) w.put(',');
                 f2 = false;
-                raw(s, o);
+                w.raw(o);
             }
-            s.append("])");
+            w.put(']').put(')');
         }
-        s.append("],[");
+        w.put(']').put(',').put('[');
         first = true;
         for (String src : drv.inputSrcs) {
-            if (!first) s.append(',');
+            if (!first) w.put(',');
             first = false;
-            raw(s, src);
+            w.raw(src);
         }
-        s.append("],");
-        quoted(s, drv.platform).append(',');
-        quoted(s, drv.builder).append(",[");
+        w.put(']').put(',');
+        w.quoted(drv.platform).put(',');
+        w.quoted(drv.builder).put(',').put('[');
         first = true;
         for (String arg : drv.args) {
-            if (!first) s.append(',');
+            if (!first) w.put(',');
             first = false;
-            quoted(s, arg);
+            w.quoted(arg);
         }
-        s.append("],[");
+        w.put(']').put(',').put('[');
         first = true;
         for (var e : drv.env.entrySet()) {
-            if (!first) s.append(',');
+            if (!first) w.put(',');
             first = false;
-            s.append('(');
-            quoted(s, e.getKey()).append(',');
-            quoted(s, e.getValue()).append(')');
+            w.put('(').quoted(e.getKey()).put(',');
+            w.quoted(e.getValue()).put(')');
         }
-        return s.append("])").toString();
+        w.put(']').put(')');
     }
 
-    private static StringBuilder raw(StringBuilder s, String v) {
-        return s.append('"').append(v).append('"');
-    }
-
-    private static StringBuilder quoted(StringBuilder s, String v) {
-        s.append('"');
-        int start = 0;
-        for (int i = 0; i < v.length(); i++) {
-            String escape = switch (v.charAt(i)) {
-                case '"' -> "\\\"";
-                case '\\' -> "\\\\";
-                case '\n' -> "\\n";
-                case '\r' -> "\\r";
-                case '\t' -> "\\t";
-                default -> null;
-            };
-            if (escape != null) {
-                s.append(v, start, i).append(escape);
-                start = i + 1;
-            }
-        }
-        return s.append(v, start, v.length()).append('"');
+    private static byte[] atermHash(Drv drv, boolean mask, TreeMap<String, TreeSet<String>> actualInputs) {
+        ATERM.reset();
+        unparse(ATERM, drv, mask, actualInputs);
+        return ATERM.digest();
     }
 
     /** Returns the ATerm of a derivation produced in this evaluation, or null. */
     public static String show(String drvPath) {
         Drv d = DRVS.get(drvPath);
-        return d == null ? null : unparse(d, false, null);
+        if (d == null) return null;
+        AtermWriter w = new AtermWriter(null);
+        unparse(w, d, false, null);
+        return w.text();
     }
 
     static byte[] parseHash(String s, String algo) {
