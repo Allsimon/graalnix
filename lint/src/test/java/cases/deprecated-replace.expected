@@ -1,0 +1,6 @@
+deprecated-replace.nix:11:32: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
+deprecated-replace.nix:12:40: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
+deprecated-replace.nix:15:7: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
+deprecated-replace.nix:16:33: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
+deprecated-replace.nix:22:7: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
+deprecated-replace.nix:26:7: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]

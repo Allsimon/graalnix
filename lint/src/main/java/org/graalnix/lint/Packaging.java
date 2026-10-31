@@ -37,6 +37,7 @@ final class Packaging {
     static void check(String src, Scope scope, List<Diagnostic> out) {
         for (Node n : scope.nodes) {
             if (n instanceof Call c && c.args().getLast() instanceof AttrSet s) finalAttrs(src, scope, c, s, out);
+            if (n instanceof Str str) replace(src, str, out);
             if (n instanceof Call c) {
                 flag(src, c, Rule.MISSING_STRUCTURED_ATTRS, "__structuredAttrs", Builders.STRUCTURED_ATTRS, out);
                 flag(src, c, Rule.MISSING_STRICT_DEPS, "strictDeps", Builders.STRICT_DEPS, out);
@@ -202,6 +203,71 @@ final class Packaging {
             edits.add(new Edit(inh.inherit().start(), inh.semi().end(), text));
         }
         return fixable;
+    }
+
+    /**
+     * Reports {@code --replace} in a call to a {@code substitute} function of stdenv's setup.sh. It scans the string
+     * as shell code, with quotes and command separators, so that a call over several lines is one command;
+     * interpolations count as words.
+     */
+    private static void replace(String src, Str str, List<Diagnostic> out) {
+        boolean indented = str.open().type() == TokenType.IND_STR_OPEN;
+        int command = str.open().end();
+        char quote = 0;
+        boolean comment = false;
+        for (Part part : str.parts()) {
+            if (!(part instanceof Lit lit)) continue;
+            for (int i = lit.start(); i < lit.end(); i++) {
+                char c = src.charAt(i);
+                if (comment) {
+                    if (c == '\n') {
+                        comment = false;
+                        command = i + 1;
+                    }
+                    continue;
+                }
+                if (indented && src.startsWith("''", i) && i + 2 < lit.end()) {
+                    // The escapes ''$, ''' and ''\x of an indented string.
+                    i += src.charAt(i + 2) == '\\' ? 3 : 2;
+                    continue;
+                }
+                if (c == '\\' && (!indented || quote != '\'')) {
+                    i++;
+                    continue;
+                }
+                if (quote != 0) {
+                    if (c == quote) quote = 0;
+                    continue;
+                }
+                switch (c) {
+                    case '\'', '"' -> quote = c;
+                    case '\n', ';', '&', '|' -> command = i + 1;
+                    // A comment, whose apostrophes are not quotes.
+                    case '#' -> comment = i == command || Character.isWhitespace(src.charAt(i - 1));
+                    case '-' -> {
+                        if (isReplace(src, i, lit.end())
+                                && src.substring(command, i).contains("substitute")) {
+                            int end = i + "--replace".length();
+                            out.add(new Diagnostic(
+                                    Rule.DEPRECATED_REPLACE,
+                                    i,
+                                    end,
+                                    "'--replace' is deprecated; use '--replace-fail'",
+                                    List.of(new Edit(i, end, "--replace-fail"))));
+                        }
+                    }
+                    default -> {}
+                }
+            }
+        }
+    }
+
+    /** Whether {@code --replace} starts at {@code i} as a word of its own. */
+    private static boolean isReplace(String src, int i, int end) {
+        int after = i + "--replace".length();
+        return src.startsWith("--replace", i)
+                && Character.isWhitespace(src.charAt(i - 1))
+                && (after == end || Character.isWhitespace(src.charAt(after)) || src.charAt(after) == '\\');
     }
 
     private static void phase(String src, Ident name, String hook, Str str, List<Diagnostic> out) {
