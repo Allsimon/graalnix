@@ -26,10 +26,14 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
-/** Runs NixOS/nix's tests/functional/lang suite the way lang.sh does, plus graalnix's own tests in graalnix/. */
+/**
+ * Runs NixOS/nix's tests/functional/lang suite the way lang.sh does, Tvix's eval tests in tvix/, and graalnix's own
+ * tests in graalnix/.
+ */
 class LangTest {
     private static final Path TESTS = testsRoot();
     private static final Path LANG = TESTS.resolve("lang");
+    private static final Path TVIX = TESTS.resolve("tvix");
     private static final Path OWN = TESTS.resolve("graalnix");
     private static final Engine ENGINE =
             Engine.newBuilder().option("engine.WarnInterpreterOnly", "false").build();
@@ -98,7 +102,7 @@ class LangTest {
 
     private static List<Path> tests(String prefix) throws IOException {
         List<Path> out = new ArrayList<>();
-        for (Path dir : List.of(LANG, OWN)) {
+        for (Path dir : List.of(LANG, TVIX, OWN)) {
             try (Stream<Path> s = Files.list(dir)) {
                 s.filter(p -> p.getFileName().toString().startsWith(prefix)
                                 && p.toString().endsWith(".nix"))
@@ -158,7 +162,7 @@ class LangTest {
     }
 
     private static DynamicTest test(Path p, org.junit.jupiter.api.function.Executable body) {
-        String n = name(p);
+        String n = (p.getParent().equals(TVIX) ? "tvix/" : "") + name(p);
         return DynamicTest.dynamicTest(n, () -> {
             if (SKIP.contains(n)) return;
             body.execute();

@@ -23,3 +23,24 @@ eval-okay-parse-flake-ref
 
 # Timestamps need the parse-toml-timestamps experimental feature
 eval-okay-fromTOML-timestamps
+
+# Tvix expectations that differ from Nix 2.34
+tvix/eval-okay-builtins-genList-function-strictness
+tvix/eval-okay-builtins-gen-list-propagate-catchable
+tvix/eval-okay-builtins-map-function-strictness
+tvix/eval-okay-builtins-map-propagate-catchable
+tvix/eval-okay-builtins-replace-strings-propagate-catchable
+tvix/eval-okay-toxml-empty
+tvix/eval-okay-xml
+
+# map, genList and sort do not force their function argument
+tvix/eval-okay-builtins-sort-propagate-catchable
+
+# == and list comparison do not follow Nix's value pointer equality
+tvix/eval-okay-observable-eval-cache
+tvix/eval-okay-value-pointer-compare
+tvix/eval-okay-value-pointer-equality
+tvix/eval-fail-cppnix-outer-value-never-pointer-equal
+
+# parseDrvName coerces sets with outPath instead of requiring a string
+tvix/eval-fail-parsedrvname-coerce

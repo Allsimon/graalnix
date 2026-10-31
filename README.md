@@ -44,8 +44,8 @@ modules. Then update `outputHash` of `deps` in `nix/package.nix`;
 Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
 
 - **Language tests.** graalnix passes NixOS/nix's `tests/functional/lang`
-  suite (303 tests) apart from the cases listed with reasons in
-  `language/src/test/java/lang-skip.txt`.
+  suite (303 tests) and Tvix's `eval/src/tests/tvix_tests`, apart from the
+  cases listed with reasons in `language/src/test/java/lang-skip.txt`.
 - **Top-level packages.** For every top-level nixpkgs attribute
   (`scripts/toplevel-drvpaths.nix`), graalnix and `nix-instantiate` produce
   24,268 identical drvPaths. 680 attributes fail in both, and none differ or

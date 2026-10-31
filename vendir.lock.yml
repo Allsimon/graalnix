@@ -9,4 +9,10 @@ directories:
       - 2.34.9
     path: .
   path: language/src/test/java/lang
+- contents:
+  - git:
+      commitTitle: 'chore(3p/sources): bump emacs-gpu to stable release...'
+      sha: 259a1617ef482482d3425d74502822ac58c4d024
+    path: .
+  path: language/src/test/java/tvix
 kind: LockConfig
