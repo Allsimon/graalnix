@@ -1,0 +1,37 @@
+<!-- Tabs for consecutive listings with the roles primary and secondary, the markup of asciidoctorj-tabbed-code-extension. -->
+<style>
+.tabs { display: flex; gap: .25em; margin-top: 1.25em; }
+.tabs button {
+  font: inherit; font-size: .9em; padding: .3em .9em; cursor: pointer;
+  border: 1px solid #dddddf; border-bottom: none; border-radius: 4px 4px 0 0;
+  background: #f7f7f8; color: rgba(0, 0, 0, .6);
+}
+.tabs button.selected { background: #fff; color: rgba(0, 0, 0, .8); font-weight: bold; }
+.tabs ~ .listingblock.primary, .tabs ~ .listingblock.secondary { margin-top: 0; }
+.listingblock[hidden] { display: none; }
+</style>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  for (const primary of document.querySelectorAll(".listingblock.primary")) {
+    const blocks = [primary];
+    for (let n = primary.nextElementSibling; n && n.matches(".listingblock.secondary"); n = n.nextElementSibling) {
+      blocks.push(n);
+    }
+    const bar = document.createElement("div");
+    bar.className = "tabs";
+    blocks.forEach((block, i) => {
+      const title = block.querySelector(":scope > .title");
+      const tab = document.createElement("button");
+      tab.textContent = title ? title.textContent : String(i + 1);
+      if (title) title.remove();
+      tab.addEventListener("click", () => blocks.forEach((b, j) => {
+        b.hidden = j !== i;
+        bar.children[j].classList.toggle("selected", j === i);
+      }));
+      bar.append(tab);
+    });
+    primary.before(bar);
+    bar.firstChild.click();
+  }
+});
+</script>

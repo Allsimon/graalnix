@@ -28,6 +28,7 @@ let
     ../format/src/test
     ../lint/src/main
     ../lint/src/test
+    ../docs/_lint-rules.adoc
   ];
   docPaths = [
     ../docs
