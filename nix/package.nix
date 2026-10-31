@@ -22,19 +22,24 @@ let
         ++ paths
       );
     };
-  src = sources [ ];
-  testSrc = sources [
+  testPaths = [
     ../language/src/test
     ../format/src/main
     ../format/src/test
     ../lint/src/main
     ../lint/src/test
   ];
+  docPaths = [
+    ../docs
+    ../jenesis.plugins.pin.properties
+  ];
+  src = sources [ ];
+  testSrc = sources testPaths;
 
   # Every artifact is pinned by checksum in the module-info.java files, so this download is reproducible.
   deps = stdenv.mkDerivation {
     name = "graalnix-deps";
-    src = testSrc;
+    src = sources (testPaths ++ docPaths);
     nativeBuildInputs = [ jdk ];
     buildPhase = ''
       runHook preBuild
@@ -57,7 +62,7 @@ let
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-+NXVRbN4rYMl966kk5NM2ndO52hptqyoIpLY7dNukvo=";
+    outputHash = "sha256-S6SSaQn7inQ1NFzkS27TD2PMIL05LoPdrAc6Ywp83UE=";
   };
 
   offline = ''
@@ -76,7 +81,8 @@ let
     buildPhase = ''
       runHook preBuild
       ${offline}
-      java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict build/jenesis/Make.java
+      java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.documentation.asciidoctor=false \
+        build/jenesis/Make.java
       runHook postBuild
     '';
     outputs = [
@@ -87,6 +93,24 @@ let
       runHook preInstall
       touch $out
       cp -r target/build/modules/compose/module/*/produce/assemble/observed/observations/jacoco/report/output/reports/jacoco $coverage
+      runHook postInstall
+    '';
+  };
+
+  docs = stdenv.mkDerivation {
+    name = "graalnix-docs";
+    src = sources docPaths;
+    nativeBuildInputs = [ jdk ];
+    buildPhase = ''
+      runHook preBuild
+      ${offline}
+      java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+        build/jenesis/Make.java stage
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      cp -r target/stage/project/output/docs $out
       runHook postInstall
     '';
   };
@@ -102,7 +126,7 @@ stdenv.mkDerivation {
     runHook preBuild
     ${offline}
     java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
-      -Djenesis.make.profiles=native build/jenesis/Make.java stage
+      -Djenesis.documentation.asciidoctor=false -Djenesis.make.profiles=native build/jenesis/Make.java stage
     runHook postBuild
   '';
 
@@ -112,7 +136,13 @@ stdenv.mkDerivation {
     runHook postInstall
   '';
 
-  passthru = { inherit deps tests; };
+  passthru = {
+    inherit
+      deps
+      tests
+      docs
+      ;
+  };
 
   meta = {
     description = "Nix language implementation on GraalVM/Truffle";

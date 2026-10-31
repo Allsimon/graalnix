@@ -1,0 +1,56 @@
+= Building
+
+The build uses https://jenesis.build[Jenesis], vendored in `build/jenesis`. Each
+module's `module-info.java` declares its build, and the tool settings live in
+`META-INF/build.jenesis/` next to the module's sources. The project-wide settings
+live in `build.jenesis/`.
+
+[source,sh]
+----
+nix develop
+java build/jenesis/Make.java                                # compile, check formatting (palantir-java-format), run the tests and render these docs
+java -Djenesis.format.rewrite=true build/jenesis/Make.java  # reformat the sources instead
+java build/jenesis/Execute.java eval -E '1 + 1'             # run the launcher on the JVM
+java -Djenesis.make.profiles=native build/jenesis/Make.java stage
+                                                            # native launcher in target/stage/native/output
+----
+
+== Documentation
+
+This documentation is written in AsciiDoc in `docs/`. Files whose names start
+with `_` are only included. The Jenesis Asciidoctor plugin, switched on by
+`build.jenesis/asciidoctor.properties`, renders it during the build. Run `stage`
+to get the HTML in `target/stage/project/output/docs/`, or build it with Nix:
+
+[source,sh]
+----
+nix build .#docs
+----
+
+== Dependencies
+
+Dependency versions and checksums live in one bill of materials,
+`build.jenesis/pin-graalnix.properties`, which every module imports with
+`@jenesis.bom`. After changing a dependency, regenerate it:
+
+[source,sh]
+----
+java -Djenesis.pin.file=build.jenesis/pin-graalnix.properties build/jenesis/Make.java pin
+java build/jenesis/Make.java pin
+----
+
+The second command pins the tools that the modules and the project plugins use
+(`jenesis.plugins.pin.properties`).
+
+== Nix
+
+`nix/package.nix` builds offline. A fixed-output `deps` derivation downloads
+every pinned artifact. After a pin changes, update its `outputHash`:
+
+[source,sh]
+----
+nix build .#graalnix.deps --rebuild
+----
+
+The flake provides `graalnix` (the native binary), `docs`, and a `tests` check
+that runs the test suite on the JVM and outputs its JaCoCo report.
