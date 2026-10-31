@@ -59,6 +59,8 @@ public final class Main {
         List<String> searchPath = new ArrayList<>();
         boolean showTrace = false;
         Context.Builder builder = Context.newBuilder("nix").allowAllAccess(true);
+        // Measured on nixpkgs: runtime compilation made evaluations 4-10% slower at 1.5x the CPU and memory.
+        builder.option("engine.Compilation", "false");
         for (int i = 1; i < argv.length; i++) {
             String a = argv[i];
             switch (a) {
