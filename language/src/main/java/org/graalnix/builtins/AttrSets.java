@@ -1,9 +1,7 @@
 package org.graalnix.builtins;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.TreeMap;
 import org.graalnix.runtime.*;
 
@@ -27,12 +25,27 @@ final class AttrSets {
         b.add("hasAttr", 2, a -> Types.attrs(a[1]).has(Types.string(a[0]).value));
         b.add("removeAttrs", 2, a -> {
             NixAttrs s = Types.attrs(a[0]);
-            Set<String> drop = new HashSet<>();
-            for (Object x : Types.list(a[1]).items) drop.add(Types.string(x).value);
-            List<Integer> keep = new ArrayList<>();
-            for (int i = 0; i < s.size(); i++) if (!drop.contains(s.keys[i])) keep.add(i);
-            if (keep.size() == s.size()) return s;
-            return subset(s, keep);
+            boolean[] drop = null;
+            int dropped = 0;
+            for (Object x : Types.list(a[1]).items) {
+                int i = s.indexOf(Types.string(x).value);
+                if (i < 0) continue;
+                if (drop == null) drop = new boolean[s.size()];
+                if (!drop[i]) dropped++;
+                drop[i] = true;
+            }
+            if (dropped == 0) return s;
+            String[] k = new String[s.size() - dropped];
+            Object[] v = new Object[k.length];
+            var p = s.positions == null ? null : new com.oracle.truffle.api.source.SourceSection[k.length];
+            for (int i = 0, o = 0; i < s.size(); i++) {
+                if (drop[i]) continue;
+                k[o] = s.keys[i];
+                v[o] = s.values[i];
+                if (p != null) p[o] = s.positions[i];
+                o++;
+            }
+            return new NixAttrs(k, v, p);
         });
         b.add("listToAttrs", 1, a -> {
             TreeMap<String, Object> m = new TreeMap<>();

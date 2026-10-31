@@ -31,4 +31,5 @@ module org.graalnix.launcher {
     // Required only to be on the module path, where the polyglot engine finds them as services.
     requires org.graalnix;
     requires org.graalvm.truffle.runtime;
+    requires com.oracle.truffle.tools.profiler;
 }
