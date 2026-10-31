@@ -1,0 +1,4 @@
+manual-inherit-from.nix:3:3: warning[manual-inherit-from]: can be written 'inherit (...) hello;' [fix]
+manual-inherit-from.nix:4:3: warning[manual-inherit-from]: can be written 'inherit (...) name;' [fix]
+manual-inherit-from.nix:5:3: warning[manual-inherit-from]: can be written 'inherit (...) options;' [fix]
+manual-inherit-from.nix:6:3: warning[manual-inherit-from]: can be written 'inherit (...) lib;' [fix]

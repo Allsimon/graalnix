@@ -1,0 +1,2 @@
+bool-simplification.nix:3:4: warning[bool-simplification]: negated comparison; use '!=' [fix]
+bool-simplification.nix:4:4: warning[bool-simplification]: negated comparison; use '==' [fix]

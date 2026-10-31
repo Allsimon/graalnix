@@ -9,7 +9,7 @@ import org.graalnix.NixContext;
 import org.graalnix.runtime.*;
 
 public final class Builtins {
-    /** Builtins that are also bound without the {@code __} prefix. */
+    /** Builtins bound without the {@code __} prefix; the others are bound only with it. */
     private static final Set<String> GLOBAL = Set.of(
             "abort",
             "baseNameOf",
@@ -17,6 +17,7 @@ public final class Builtins {
             "derivation",
             "derivationStrict",
             "dirOf",
+            "false",
             "fetchGit",
             "fetchMercurial",
             "fetchTarball",
@@ -25,11 +26,13 @@ public final class Builtins {
             "import",
             "isNull",
             "map",
+            "null",
             "placeholder",
             "removeAttrs",
             "scopedImport",
             "throw",
-            "toString");
+            "toString",
+            "true");
 
     public static final String NIX_VERSION = "2.34.9";
 
@@ -72,12 +75,9 @@ public final class Builtins {
 
         ctx.globals.put("builtins", self);
         for (var e : b.values.entrySet()) {
-            ctx.globals.put("__" + e.getKey(), e.getValue());
-            if (GLOBAL.contains(e.getKey())) ctx.globals.put(e.getKey(), e.getValue());
+            String name = e.getKey();
+            ctx.globals.put(GLOBAL.contains(name) ? name : "__" + name, e.getValue());
         }
-        ctx.globals.put("true", true);
-        ctx.globals.put("false", false);
-        ctx.globals.put("null", NixNull.INSTANCE);
     }
 
     static NixException catchable(String message) {

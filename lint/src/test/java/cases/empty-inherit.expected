@@ -1,0 +1,2 @@
+empty-inherit.nix:2:11: warning[empty-inherit]: 'inherit' with no names [fix]
+empty-inherit.nix:3:3: warning[empty-inherit]: 'inherit' with no names [fix]

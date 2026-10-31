@@ -36,6 +36,7 @@
 module org.graalnix.test {
     requires org.graalnix;
     requires org.graalnix.parser;
+    requires org.graalnix.lint;
     requires org.graalvm.polyglot;
     requires org.junit.jupiter;
     requires org.assertj.core;

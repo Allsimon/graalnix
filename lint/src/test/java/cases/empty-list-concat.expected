@@ -1,0 +1,3 @@
+empty-list-concat.nix:3:4: warning[empty-list-concat]: concatenation with an empty list [fix]
+empty-list-concat.nix:4:4: warning[empty-list-concat]: concatenation with an empty list [fix]
+empty-list-concat.nix:5:4: warning[empty-list-concat]: concatenation with an empty list [fix]

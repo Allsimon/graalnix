@@ -1,0 +1,2 @@
+collapsible-let-in.nix:6:5: warning[collapsible-let-in]: this 'let' can be merged into the outer one [fix]
+collapsible-let-in.nix:16:5: warning[collapsible-let-in]: this 'let' can be merged into the outer one

@@ -1,0 +1,1 @@
+empty-pattern.nix:2:4: warning[empty-pattern]: empty pattern; use '_' if the argument is not needed

@@ -1,0 +1,1 @@
+legacy-let-syntax.nix:1:1: warning[legacy-let-syntax]: legacy 'let { }' syntax; use 'let ... in' [fix]

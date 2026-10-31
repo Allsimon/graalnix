@@ -1,0 +1,3 @@
+deprecated-is-null.nix:3:4: warning[deprecated-is-null]: 'isNull' is deprecated; use '== null' [fix]
+deprecated-is-null.nix:4:4: warning[deprecated-is-null]: 'isNull' is deprecated; use '== null' [fix]
+deprecated-is-null.nix:5:5: warning[deprecated-is-null]: 'isNull' is deprecated; use '== null' [fix]

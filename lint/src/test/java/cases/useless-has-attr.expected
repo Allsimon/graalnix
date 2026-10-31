@@ -1,0 +1,2 @@
+useless-has-attr.nix:3:4: warning[useless-has-attr]: can be written 'x.a or ...' [fix]
+useless-has-attr.nix:4:4: warning[useless-has-attr]: can be written 'x.y.a.b or ...' [fix]

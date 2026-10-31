@@ -1,0 +1,2 @@
+redundant-pattern-bind.nix:2:4: warning[redundant-pattern-bind]: '{ ... }@args' is the same as 'args' [fix]
+redundant-pattern-bind.nix:3:4: warning[redundant-pattern-bind]: '{ ... }@args' is the same as 'args' [fix]

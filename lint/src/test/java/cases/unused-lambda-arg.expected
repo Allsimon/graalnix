@@ -1,0 +1,2 @@
+unused-lambda-arg.nix:2:13: warning[unused-lambda-arg]: unused lambda argument 'x' [fix]
+unused-lambda-arg.nix:6:16: warning[unused-lambda-arg]: unused lambda argument 'y'

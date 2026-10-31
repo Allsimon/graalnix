@@ -73,6 +73,12 @@ Checked against Nix 2.34.9 and nixpkgs `31ecbaca1bde` on x86_64-linux:
   [nixfmt](https://github.com/NixOS/nixfmt) 1.5.0 (MPL-2.0) on top of the
   parser. Its tests run nixfmt's own suite from `format/src/test/java/nixfmt/`,
   kept in sync with vendir.
+- `lint/`: a linter, `org.graalnix.lint.Linter`, with checks in the spirit of
+  [deadnix](https://github.com/astro/deadnix) (unused bindings),
+  [statix](https://github.com/oppiliappan/statix) (simpler forms) and
+  [nixd](https://github.com/nix-community/nixd) (undefined variables, unknown
+  builtins, unused `with` and `rec`). Most findings come with a fix, which
+  `Linter.fix` applies. Its tests are the cases in `lint/src/test/java/cases/`.
 - `store/`: NAR hashing, Nix base32 and store-path computation.
 - `language/`: the Truffle language. It contains:
   - `Translator`: static scope resolution into Truffle nodes.

@@ -1,0 +1,2 @@
+empty-let-in.nix:1:1: warning[empty-let-in]: 'let' with no bindings [fix]
+empty-let-in.nix:4:7: warning[empty-let-in]: 'let' with no bindings [fix]
