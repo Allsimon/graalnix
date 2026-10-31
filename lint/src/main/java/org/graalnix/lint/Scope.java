@@ -69,6 +69,9 @@ final class Scope {
     final List<Def> defs = new ArrayList<>();
     final Map<Node, List<Def>> owned = new IdentityHashMap<>();
     final Map<Ident, Def> resolved = new IdentityHashMap<>();
+    /** The names of {@code inherit} without a source, and the definitions they take. */
+    final Map<AttrNode, Def> inherited = new IdentityHashMap<>();
+
     final List<Ident> undefined = new ArrayList<>();
     final Set<With> usedWiths = Collections.newSetFromMap(new IdentityHashMap<>());
     final Map<Node, Node> parents = new IdentityHashMap<>();
@@ -218,7 +221,8 @@ final class Scope {
                     String s = Nodes.staticName(name);
                     if (s == null) continue;
                     Def d = let != null ? let.names.get(s) : null;
-                    use(null, s, outer, d == null ? groups : with(groups, new Def[] {d}));
+                    Def from = use(null, s, outer, d == null ? groups : with(groups, new Def[] {d}));
+                    if (from != null) inherited.put(name, from);
                 }
             }
         }
@@ -237,7 +241,7 @@ final class Scope {
         return out;
     }
 
-    private void use(Ident ident, String name, Frame f, List<Def[]> groups) {
+    private Def use(Ident ident, String name, Frame f, List<Def[]> groups) {
         if (ident != null) frames.put(ident, f);
         boolean withs = false;
         for (Frame fr = f; fr != null; fr = fr.parent) {
@@ -251,11 +255,12 @@ final class Scope {
                 Use u = new Use(d, groups.subList(fr.depth, groups.size()));
                 d.uses.add(u);
                 uses.add(u);
-                return;
+                return d;
             }
         }
         for (Frame fr = f; fr != null; fr = fr.parent) if (fr.with != null) usedWiths.add(fr.with);
         if (ident != null && !withs && !Globals.NAMES.contains(name)) undefined.add(ident);
+        return null;
     }
 
     /** Marks live the definitions reached by uses whose every group holds a live definition. */

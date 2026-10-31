@@ -42,7 +42,10 @@ class LintDocsTest {
                 "Semantics",
                 "Checks that need name resolution, as https://github.com/nix-community/nixd[nixd] makes them.",
                 EnumSet.range(Rule.UNDEFINED_VARIABLE, Rule.EXTRA_WITH)),
-        new Group("Packaging", "Conventions of nixpkgs for derivations.", EnumSet.of(Rule.MISSING_PHASE_HOOKS)),
+        new Group(
+                "Packaging",
+                "Conventions of nixpkgs for derivations.",
+                EnumSet.range(Rule.MISSING_PHASE_HOOKS, Rule.MISSING_FINAL_ATTRS)),
     };
 
     @Test
