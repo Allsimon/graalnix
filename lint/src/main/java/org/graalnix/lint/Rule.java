@@ -106,7 +106,12 @@ public enum Rule {
             "`substituteInPlace` and the other `substitute` functions called with `--replace`, which is deprecated"
                     + " and behaves as `--replace-warn`: a pattern that no longer matches only prints a warning. The"
                     + " fix uses `--replace-fail`, which makes such a build fail instead, so check that the package"
-                    + " still builds.");
+                    + " still builds."),
+    SRI_HASH(
+            WARNING,
+            "A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix"
+                    + " renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes"
+                    + " `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.");
 
     private final Severity severity;
     private final String description;

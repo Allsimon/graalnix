@@ -24,6 +24,7 @@
  */
 module org.graalnix.lint {
     requires org.graalnix.parser;
+    requires org.graalnix.store;
 
     exports org.graalnix.lint;
 }

@@ -148,6 +148,10 @@ Each rule shows a case from the linter's tests: the original code, what `Linter.
 |warning
 |`substituteInPlace` and the other `substitute` functions called with `--replace`, which is deprecated and behaves as `--replace-warn`: a pattern that no longer matches only prints a warning. The fix uses `--replace-fail`, which makes such a build fail instead, so check that the package still builds.
 
+|<<lint-sri-hash,`sri-hash`>>
+|warning
+|A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.
+
 |===
 
 == Syntax errors
@@ -1857,4 +1861,152 @@ deprecated-replace.nix:15:7: warning[deprecated-replace]: '--replace' is depreca
 deprecated-replace.nix:16:33: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
 deprecated-replace.nix:22:7: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
 deprecated-replace.nix:26:7: warning[deprecated-replace]: '--replace' is deprecated; use '--replace-fail' [fix]
+----
+
+[[lint-sri-hash]]
+=== `sri-hash`
+
+Severity: warning. A fetcher given `sha256`, where nixpkgs uses `hash` with an SRI hash such as `sha256-...=`. The fix renames it and converts a literal in Nix base32, hex or base64; `lib.fakeSha256` becomes `lib.fakeHash`. Fetchers that take only `sha256`, such as `fetchHex`, are not reported.
+
+[source,nix,role="primary"]
+.Original
+----
+{
+  lib,
+  fetchurl,
+  fetchFromGitHub,
+  fetchHex,
+  sha256,
+}:
+# Each hash is sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ= in another encoding.
+[
+  (fetchurl {
+    url = "https://example.org/a.tar.gz";
+    sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+  })
+  (fetchurl {
+    url = "https://example.org/b.tar.gz";
+    sha256 = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+  })
+  (fetchFromGitHub {
+    owner = "example";
+    repo = "c";
+    rev = "v1";
+    sha256 = "sha256:LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=";
+  })
+  (fetchFromGitHub {
+    owner = "example";
+    repo = "d";
+    rev = "v1";
+    sha256 = lib.fakeSha256;
+  })
+  # Not fixed: only a literal can be converted.
+  (fetchurl {
+    url = "https://example.org/e.tar.gz";
+    inherit sha256;
+  })
+  (fetchurl {
+    url = "https://example.org/f.tar.gz";
+    sha256 = sha256;
+  })
+  # Not fixed: the url refers to it.
+  (fetchurl rec {
+    url = "https://example.org/i_${sha256}.deb";
+    sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+  })
+  # A fetcher of the file's own, which may take only sha256.
+  (
+    let
+      fetchurl = { url, sha256 }: builtins.fetchurl { inherit url sha256; };
+    in
+    fetchurl {
+      url = "https://example.org/h.tar.gz";
+      sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+    }
+  )
+  # fetchHex takes only sha256.
+  (fetchHex {
+    pkg = "g";
+    version = "1";
+    sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+  })
+]
+----
+
+[source,nix,role="secondary"]
+.Fixed
+----
+{
+  lib,
+  fetchurl,
+  fetchFromGitHub,
+  fetchHex,
+  sha256,
+}:
+# Each hash is sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ= in another encoding.
+[
+  (fetchurl {
+    url = "https://example.org/a.tar.gz";
+    hash = "sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=";
+  })
+  (fetchurl {
+    url = "https://example.org/b.tar.gz";
+    hash = "sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=";
+  })
+  (fetchFromGitHub {
+    owner = "example";
+    repo = "c";
+    rev = "v1";
+    hash = "sha256-LPJNul+wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ=";
+  })
+  (fetchFromGitHub {
+    owner = "example";
+    repo = "d";
+    rev = "v1";
+    hash = lib.fakeHash;
+  })
+  # Not fixed: only a literal can be converted.
+  (fetchurl {
+    url = "https://example.org/e.tar.gz";
+    inherit sha256;
+  })
+  (fetchurl {
+    url = "https://example.org/f.tar.gz";
+    inherit sha256;
+  })
+  # Not fixed: the url refers to it.
+  (fetchurl rec {
+    url = "https://example.org/i_${sha256}.deb";
+    sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+  })
+  # A fetcher of the file's own, which may take only sha256.
+  (
+    let
+      fetchurl = { url, sha256 }: builtins.fetchurl { inherit url sha256; };
+    in
+    fetchurl {
+      url = "https://example.org/h.tar.gz";
+      sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+    }
+  )
+  # fetchHex takes only sha256.
+  (fetchHex {
+    pkg = "g";
+    version = "1";
+    sha256 = "094qif9n4cq4fdg459qzbhg1c6wywawwaaivx0k0x8xhbyx4vwic";
+  })
+]
+----
+
+[source,text,role="secondary"]
+.Diagnostics
+----
+sri-hash.nix:12:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256' [fix]
+sri-hash.nix:16:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256' [fix]
+sri-hash.nix:22:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256' [fix]
+sri-hash.nix:28:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256' [fix]
+sri-hash.nix:33:13: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256'
+sri-hash.nix:37:5: warning[manual-inherit]: 'sha256 = sha256;' can be written 'inherit sha256;' [fix]
+sri-hash.nix:37:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256'
+sri-hash.nix:42:5: warning[sri-hash]: use 'hash' with an SRI hash instead of 'sha256'
 ----
