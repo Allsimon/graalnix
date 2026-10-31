@@ -1,6 +1,8 @@
 package org.graalnix.lint;
 
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -8,6 +10,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import org.graalnix.parser.Syntax.*;
 import org.graalnix.parser.TokenType;
+import org.graalnix.store.NixBase32;
 
 /** Conventions of nixpkgs for derivations. */
 final class Packaging {
@@ -38,6 +41,7 @@ final class Packaging {
         for (Node n : scope.nodes) {
             if (n instanceof Call c && c.args().getLast() instanceof AttrSet s) finalAttrs(src, scope, c, s, out);
             if (n instanceof Str str) replace(src, str, out);
+            if (n instanceof Call c) sriHash(src, scope, c, out);
             if (n instanceof Call c) {
                 flag(src, c, Rule.MISSING_STRUCTURED_ATTRS, "__structuredAttrs", Builders.STRUCTURED_ATTRS, out);
                 flag(src, c, Rule.MISSING_STRICT_DEPS, "strictDeps", Builders.STRICT_DEPS, out);
@@ -203,6 +207,91 @@ final class Packaging {
             edits.add(new Edit(inh.inherit().start(), inh.semi().end(), text));
         }
         return fixable;
+    }
+
+    /** Reports {@code sha256} given to a fetcher that takes {@code hash}, and converts its value to SRI. */
+    private static void sriHash(String src, Scope scope, Call call, List<Diagnostic> out) {
+        if (!(call.args().getLast() instanceof AttrSet set)) return;
+        // A fetcher defined in the file, rather than taken from nixpkgs, may take only sha256.
+        if (call.fn() instanceof Ident i
+                && scope.resolved.get(i) instanceof Scope.Def d
+                && (d.kind == Scope.Kind.LET || d.kind == Scope.Kind.REC)) return;
+        String fetcher = switch (call.fn()) {
+            case Ident i -> Scope.name(i);
+            case Select s -> Nodes.staticName(s.path().getLast().attr());
+            default -> null;
+        };
+        if (fetcher == null || !Builders.HASH_FETCHERS.contains(fetcher)) return;
+        // builtins.fetchurl and the like take only sha256.
+        if (call.fn() instanceof Select s
+                && s.target() instanceof Ident t
+                && Scope.name(t).equals("builtins")) return;
+        AttrNode name = null;
+        Node given = null;
+        for (Binding b : set.binds()) {
+            if (names(b).contains("hash")) return;
+            switch (b) {
+                case Assign a
+                when a.path().size() == 1 && "sha256".equals(names(b).getFirst()) -> {
+                    name = a.path().getFirst().attr();
+                    given = a.value();
+                }
+                case Inherit i -> {
+                    for (AttrNode a : i.names()) if ("sha256".equals(Nodes.staticName(a))) name = a;
+                }
+                default -> {}
+            }
+        }
+        if (name == null) return;
+        // In a rec set, a sibling may refer to it, as in url = "...${sha256}.deb", and lose it once renamed.
+        boolean used = scope.owned.getOrDefault(set, List.of()).stream()
+                .anyMatch(d -> d.name.equals("sha256") && !d.uses.isEmpty());
+        String value = given == null || used ? null : sri(src, given);
+        out.add(new Diagnostic(
+                Rule.SRI_HASH,
+                Nodes.attrStart(name),
+                Nodes.attrEnd(name),
+                "use 'hash' with an SRI hash instead of 'sha256'",
+                value == null
+                        ? List.of()
+                        : List.of(
+                                new Edit(Nodes.attrStart(name), Nodes.attrEnd(name), "hash"),
+                                new Edit(Nodes.start(given), Nodes.end(given), value))));
+    }
+
+    /** The value of {@code hash} for {@code sha256 = v}, or null when it is not a literal hash. */
+    private static String sri(String src, Node v) {
+        if (v instanceof Select s
+                && s.fallback() == null
+                && "fakeSha256".equals(Nodes.staticName(s.path().getLast().attr()))) {
+            String text = Nodes.text(src, s);
+            return text.substring(0, text.length() - "fakeSha256".length()) + "fakeHash";
+        }
+        if (!(v instanceof Str s) || !s.parts().stream().allMatch(p -> p instanceof Lit)) return null;
+        StringBuilder sb = new StringBuilder();
+        for (Part p : s.parts()) sb.append(((Lit) p).text());
+        String hash = sri(sb.toString().strip());
+        return hash == null ? null : "\"" + hash + "\"";
+    }
+
+    /** Converts a SHA-256 in any of the forms Nix accepts, Nix base32, hex, base64 or SRI, to SRI. */
+    static String sri(String hash) {
+        if (hash.isEmpty() || hash.startsWith("sha256-")) return hash;
+        if (hash.startsWith("sha256:")) hash = hash.substring("sha256:".length());
+        byte[] bytes;
+        try {
+            bytes = switch (hash.length()) {
+                case 52 -> NixBase32.decode(hash, 32);
+                case 64 -> HexFormat.of().parseHex(hash);
+                case 44 -> Base64.getDecoder().decode(hash);
+                default -> null;
+            };
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        return bytes == null || bytes.length != 32
+                ? null
+                : "sha256-" + Base64.getEncoder().encodeToString(bytes);
     }
 
     /**

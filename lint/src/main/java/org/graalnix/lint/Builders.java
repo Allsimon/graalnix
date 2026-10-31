@@ -35,4 +35,34 @@ public final class Builders {
     /** The builders that set {@code __structuredAttrs} to true when a derivation does not set it. */
     public static final Set<String> STRUCTURED_ATTRS =
             Set.of("buildHomeAssistantComponent", "buildPythonApplication", "buildPythonPackage");
+
+    /** The fetchers that take {@code hash}, as nixpkgs calls them; others, such as fetchHex, take only sha256. */
+    public static final Set<String> HASH_FETCHERS = Set.of(
+            "fetchbzr",
+            "fetchCargoVendor",
+            "fetchCrate",
+            "fetchDebianPatch",
+            "fetchdarcs",
+            "fetchfossil",
+            "fetchFromBitbucket",
+            "fetchFromCodeberg",
+            "fetchFromGitea",
+            "fetchFromGitHub",
+            "fetchFromGitiles",
+            "fetchFromGitLab",
+            "fetchFromRepoOrCz",
+            "fetchFromSourcehut",
+            "fetchgit",
+            "fetchhg",
+            "fetchMavenArtifact",
+            "fetchNpmDeps",
+            "fetchNuGet",
+            "fetchpatch",
+            "fetchpatch2",
+            "fetchPypi",
+            "fetchRepoProject",
+            "fetchsvn",
+            "fetchurl",
+            "fetchYarnDeps",
+            "fetchzip");
 }
