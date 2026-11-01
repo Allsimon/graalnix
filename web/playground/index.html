@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>graalnix playground</title>
+<style>
+:root { color-scheme: light dark; --border: #8884; --muted: #888; --error: #d33; --warning: #c80; --hint: #38c; }
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.4 system-ui, sans-serif; display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: .75em 1.25em; padding: .6em 1em; border-bottom: 1px solid var(--border); }
+header h1 { font-size: 1.05em; margin: 0 .5em 0 0; }
+header label { display: flex; align-items: center; gap: .35em; }
+header input[type=number] { width: 4.5em; }
+#status { color: var(--muted); margin-left: auto; }
+main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+section { display: grid; grid-template-rows: auto 1fr; min-height: 0; min-width: 0; }
+section + section { border-left: 1px solid var(--border); }
+h2 { margin: 0; padding: .3em 1em; font-size: .85em; font-weight: normal; color: var(--muted); border-bottom: 1px solid var(--border); }
+textarea { width: 100%; height: 100%; border: 0; padding: 1em; resize: none; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; outline: none; background: transparent; color: inherit; white-space: pre; }
+#output.failed { color: var(--error); white-space: pre-wrap; }
+#findings { margin: 0; padding: .4em 0; list-style: none; max-height: 30vh; overflow: auto; border-top: 1px solid var(--border); font-size: 14px; }
+#findings li { padding: .2em 1em; cursor: pointer; }
+#findings li:hover { background: #8882; }
+#findings .where { font-family: ui-monospace, monospace; color: var(--muted); }
+#findings .error { color: var(--error); }
+#findings .warning { color: var(--warning); }
+#findings .hint { color: var(--hint); }
+#findings .rule { font-family: ui-monospace, monospace; }
+#findings .none { color: var(--muted); cursor: default; }
+#findings .none:hover { background: none; }
+@media (max-width: 800px) {
+  main { grid-template-columns: none; grid-template-rows: 1fr 1fr; }
+  section + section { border-left: 0; border-top: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>graalnix playground</h1>
+  <label title="Format, as nixfmt does"><input type="radio" name="mode" value="format"> Format</label>
+  <label title="Apply the linter's fixes, then format"><input type="radio" name="mode" value="fix" checked> Fix</label>
+  <label>Width <input id="width" type="number" min="20" max="400" value="100"></label>
+  <label>Indent <input id="indent" type="number" min="1" max="16" value="2"></label>
+  <label><input id="strict" type="checkbox"> Strict</label>
+  <span id="status"></span>
+</header>
+<main>
+  <section>
+    <h2>Input</h2>
+    <!-- pkgs/by-name/kc/kcgi/package.nix of nixpkgs 718f670e845328e9c2cecdd832835712b2cbd065 -->
+    <textarea id="source" spellcheck="false" aria-label="Nix source">{
+  lib,
+  stdenv,
+  pkg-config,
+  fetchFromGitHub,
+  libbsd,
+}:
+
+stdenv.mkDerivation rec {
+  pname = "kcgi";
+  version = "0.10.8";
+  underscoreVersion = lib.replaceStrings [ "." ] [ "_" ] version;
+
+  src = fetchFromGitHub {
+    owner = "kristapsdz";
+    repo = "kcgi";
+    rev = "VERSION_${underscoreVersion}";
+    sha256 = "0ha6r7bcgf6pcn5gbd2sl7835givhda1jql49c232f1iair1yqyp";
+  };
+  patchPhase = ''
+    substituteInPlace configure \
+      --replace /usr/local /
+  '';
+
+  nativeBuildInputs = [ pkg-config ];
+  buildInputs = [ ] ++ lib.optionals stdenv.hostPlatform.isLinux [ libbsd ];
+
+  dontAddPrefix = true;
+
+  installFlags = [ "DESTDIR=$(out)" ];
+
+  meta = {
+    broken = (stdenv.hostPlatform.isLinux &amp;&amp; stdenv.hostPlatform.isAarch64);
+    homepage = "https://kristaps.bsd.lv/kcgi";
+    description = "Minimal CGI and FastCGI library for C/C++";
+    license = lib.licenses.isc;
+    platforms = lib.platforms.all;
+    mainProgram = "kfcgi";
+  };
+}
+</textarea>
+  </section>
+  <section>
+    <h2 id="title">Fixed and formatted</h2>
+    <textarea id="output" spellcheck="false" readonly aria-live="polite"></textarea>
+  </section>
+</main>
+<ul id="findings" aria-live="polite"></ul>
+<script src="graalnix.js"></script>
+<script>
+"use strict";
+const source = document.getElementById("source");
+const output = document.getElementById("output");
+const findings = document.getElementById("findings");
+const status = document.getElementById("status");
+const controls = document.querySelectorAll("header input");
+const mode = () => document.querySelector("input[name=mode]:checked").value;
+const options = () => [
+  Number(document.getElementById("width").value) || 100,
+  Number(document.getElementById("indent").value) || 2,
+  document.getElementById("strict").checked,
+];
+
+function position(text, offset) {
+  const before = text.slice(0, offset);
+  const line = before.split("\n").length;
+  return line + ":" + (offset - before.lastIndexOf("\n"));
+}
+
+function select(start, end) {
+  source.focus();
+  source.setSelectionRange(start, Math.max(start, end));
+  const line = source.value.slice(0, start).split("\n").length - 1;
+  const height = source.scrollHeight / source.value.split("\n").length;
+  source.scrollTop = Math.max(0, line * height - source.clientHeight / 3);
+}
+
+function item(className, text, start, end) {
+  const li = document.createElement("li");
+  li.className = className;
+  li.append(...text);
+  if (start !== undefined) li.addEventListener("click", () => select(start, end));
+  return li;
+}
+
+function span(className, text) {
+  const s = document.createElement("span");
+  s.className = className;
+  s.textContent = text;
+  return s;
+}
+
+function showFindings(text) {
+  const result = JSON.parse(self.lint(text));
+  findings.replaceChildren();
+  if (result.error) {
+    findings.append(item("error", [result.error.message]));
+  } else if (result.diagnostics.length === 0) {
+    findings.append(item("none", ["No findings."]));
+  } else {
+    for (const d of result.diagnostics) {
+      findings.append(item("", [
+        span("where", position(text, d.start) + " "),
+        span(d.severity, d.severity),
+        span("rule", "[" + d.rule + "] "),
+        d.message + (d.fixable ? " (fixable)" : ""),
+      ], d.start, d.end));
+    }
+  }
+}
+
+function showOutput(text) {
+  const name = mode();
+  document.getElementById("title").textContent = name === "fix" ? "Fixed and formatted" : "Formatted";
+  const result = JSON.parse(self[name](text, ...options()));
+  output.classList.toggle("failed", Boolean(result.error));
+  output.value = result.error
+    ? position(text, result.error.start) + ": " + result.error.message
+    : result.output;
+}
+
+function refresh() {
+  const text = source.value;
+  const started = performance.now();
+  showOutput(text);
+  showFindings(text);
+  status.textContent = "in " + Math.round(performance.now() - started) + " ms";
+}
+
+let pending;
+source.addEventListener("input", () => {
+  clearTimeout(pending);
+  pending = setTimeout(refresh, 150);
+});
+for (const control of controls) control.addEventListener("input", refresh);
+refresh();
+</script>
+</body>
+</html>

@@ -8,6 +8,7 @@ memory, without writing anything to `/nix/store`.
 nix build .#graalnix          # on OpenJDK 25
 nix build .#graalnix-native   # static native binary (musl), built with GraalVM
 nix build .#graalnix-lite     # format, check and fix only, without Truffle; also graalnix-lite-native
+nix build .#playground        # format, fix and lint in the browser: open result/index.html
 ./result/bin/graalnix eval --strict -E 'builtins.map (x: x * 2) [ 1 2 3 ]'
 ./result/bin/graalnix drv-path -I nixpkgs=/path/to/nixpkgs -E 'import <nixpkgs> {}' -A hello
 ./result/bin/graalnix check .   # lint

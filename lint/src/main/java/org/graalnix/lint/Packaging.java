@@ -2,10 +2,10 @@ package org.graalnix.lint;
 
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.graalnix.parser.Syntax.*;
@@ -367,7 +367,7 @@ final class Packaging {
         try {
             bytes = switch (hash.length()) {
                 case 52 -> NixBase32.decode(hash, 32);
-                case 64 -> HexFormat.of().parseHex(hash);
+                case 64 -> hex(hash);
                 case 44 -> Base64.getDecoder().decode(hash);
                 default -> null;
             };
@@ -377,6 +377,22 @@ final class Packaging {
         return bytes == null || bytes.length != 32
                 ? null
                 : "sha256-" + Base64.getEncoder().encodeToString(bytes);
+    }
+
+    // HexFormat and String.lines are missing from TeaVM's class library, which compiles this for the web playground.
+    private static byte[] hex(String s) {
+        byte[] out = new byte[s.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) (hexDigit(s.charAt(2 * i)) << 4 | hexDigit(s.charAt(2 * i + 1)));
+        }
+        return out;
+    }
+
+    private static int hexDigit(char c) {
+        if (c >= '0' && c <= '9') return c - '0';
+        if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+        if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+        throw new IllegalArgumentException("not a hex digit: " + c);
     }
 
     /**
@@ -476,12 +492,24 @@ final class Packaging {
                 || last < 0
                 || !body.substring(last + 1).isBlank()
                 || body.isBlank()) return List.of();
-        String line = body.lines().filter(l -> !l.isBlank()).findFirst().orElseThrow();
+        String line = firstNonBlankLine(body);
         String indent = line.substring(0, line.length() - line.stripLeading().length());
         int base = str.open().end();
         List<Edit> edits = new ArrayList<>();
         if (pre != null) edits.add(new Edit(base, base, indent + pre + "\n\n"));
         if (post != null) edits.add(new Edit(base + last + 1, base + last + 1, "\n" + indent + post + "\n"));
         return edits;
+    }
+
+    private static String firstNonBlankLine(String s) {
+        int start = 0;
+        for (int i = 0; i <= s.length(); i++) {
+            if (i == s.length() || s.charAt(i) == '\n' || s.charAt(i) == '\r') {
+                String line = s.substring(start, i);
+                if (!line.isBlank()) return line;
+                start = i + 1;
+            }
+        }
+        throw new NoSuchElementException();
     }
 }

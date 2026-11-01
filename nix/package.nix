@@ -6,6 +6,8 @@
   fetchurl,
   installShellFiles,
   linkFarm,
+  nodejs,
+  runCommand,
   makeWrapper,
   unzip,
 }:
@@ -204,6 +206,40 @@ let
     };
   };
 
+  playground = stdenv.mkDerivation {
+    pname = "graalnix-playground";
+    version = "0.1.0";
+    src = sources [
+      ../web/src/main
+      ../web/playground
+      ../plugins
+      ../jenesis.plugins.properties
+      ../jenesis.plugins.pin.properties
+    ];
+    nativeBuildInputs = [ jdk ];
+    buildPhase = ''
+      runHook preBuild
+      ${offline}
+      java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+        -Djenesis.documentation.asciidoctor=false ${package "web" null}
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      install -Dm644 web/playground/index.html $out/index.html
+      install -Dm644 ${output "web"}/custom/teavm/delegate/teavm/output/javascript/graalnix.js $out/graalnix.js
+      runHook postInstall
+    '';
+    meta = {
+      description = "The formatter and linter of graalnix in the browser, compiled to JavaScript by TeaVM";
+      platforms = lib.platforms.all;
+    };
+  };
+
+  playgroundTests = runCommand "graalnix-playground-tests" { nativeBuildInputs = [ nodejs ]; } ''
+    node ${../web/check.cjs} ${playground}/graalnix.js ${../format/src/test/java} ${../lint/src/test/java/cases} | tee $out
+  '';
+
   lite = {
     pname = "graalnix-lite";
     module = "cli";
@@ -215,7 +251,13 @@ let
 in
 (jvm full).overrideAttrs {
   passthru = {
-    inherit deps tests docs;
+    inherit
+      deps
+      tests
+      docs
+      playground
+      playgroundTests
+      ;
     native = native (
       full
       // {

@@ -21,6 +21,28 @@ and its own `graalnix` command with only these. `launcher` adds `eval` and
 `Execute.java` run the launcher; `-Djenesis.execute.module=cli/src/main/java`
 runs the other. The native profile of `cli` is `native-lite`.
 
+== Playground
+
+The `web` module wraps the formatter and linter for JavaScript: `Playground`
+exports `format`, `fix` and `lint`, each returning JSON. TeaVM compiles it with
+its dependencies to `graalnix.js` at the module's package step, through the
+project plugin in `plugins/teavm`, which `jenesis.plugins.properties` declares
+and the module's `plugin-teavm.properties` switches on. TeaVM's jars are no
+modules, so the plugin resolves them onto a class path and runs TeaVM in a JVM
+of its own. Their pins live in the `web` declaration: TeaVM's asm is older than
+the tools', so they cannot share the bill of materials.
+
+TeaVM's class library has no `HexFormat` and no `String.lines`: code the
+playground reaches must do without them, or the build fails naming the method.
+
+[source,sh]
+----
+java build/jenesis/Make.java build/modules/compose/module/package-module-web+src+main+java
+nix shell nixpkgs#nodejs -c node web/check.cjs \
+  target/build/modules/compose/module/package-module-web+src+main+java/custom/teavm/delegate/teavm/output/javascript/graalnix.js \
+  format/src/test/java lint/src/test/java/cases   # the formatter and linter test cases, in JavaScript
+----
+
 == Documentation
 
 This documentation is written in AsciiDoc in `docs/`. Files whose names start
@@ -67,6 +89,10 @@ which only interprets; runtime compilation is off by default anyway.
 `graalnix-lite`:: the `cli` module on OpenJDK 25: `format`, `check` and `fix`
 only, without Truffle.
 `graalnix-lite-native`:: the `cli` module as a static native image.
+`playground`:: `web/playground/index.html` and `graalnix.js`: a page that
+formats, fixes and lints Nix in the browser, opened as a file, with no server.
 `docs`:: this documentation, rendered to HTML.
 `tests`:: a check that runs the test suite on the JVM and outputs its JaCoCo
 report.
+`playground-tests`:: a check that runs the formatter and linter test cases
+against `graalnix.js` in Node.js.
