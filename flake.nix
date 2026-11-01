@@ -19,6 +19,7 @@
         graalnix-lite = graalnix.lite;
         graalnix-lite-native = graalnix.lite-native;
         inherit (graalnix) docs playground;
+        maven-repo = graalnix.mavenRepo;
         default = graalnix;
       });
 
@@ -29,7 +30,12 @@
           graalnix-lite
           graalnix-lite-native
           ;
-        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests docs playground;
+        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix)
+          tests
+          docs
+          playground
+          mavenRepo
+          ;
         playground-tests = self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix.playgroundTests;
         lint-builders = pkgs.callPackage ./nix/lint-builders.nix { };
       });
