@@ -29,7 +29,7 @@ let
     ../launcher/src/test
     ../format/src/test
     ../lint/src/test
-    ../docs/_cli
+    ../docs/cli
     ../docs/_lint-rules.adoc
   ];
   docPaths = [

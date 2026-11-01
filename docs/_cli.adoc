@@ -1,32 +1,11 @@
 = Command line
 
-The reference of each command is generated from the command line itself;
+Each command has its own page, generated from the command line itself;
 `-h` or `--help` after any command prints the same.
 
-[[cli-format]]
-== graalnix format
-
-include::_cli/graalnix-format.adoc[tags=picocli-generated-man-section-synopsis;picocli-generated-man-section-description;picocli-generated-man-section-options;picocli-generated-man-section-arguments;picocli-generated-man-section-exit-status;picocli-generated-man-section-footer,leveloffset=+1]
-
-[[cli-check]]
-== graalnix check
-
-include::_cli/graalnix-check.adoc[tags=picocli-generated-man-section-synopsis;picocli-generated-man-section-description;picocli-generated-man-section-options;picocli-generated-man-section-arguments;picocli-generated-man-section-exit-status;picocli-generated-man-section-footer,leveloffset=+1]
-
-[[cli-fix]]
-== graalnix fix
-
-include::_cli/graalnix-fix.adoc[tags=picocli-generated-man-section-synopsis;picocli-generated-man-section-description;picocli-generated-man-section-options;picocli-generated-man-section-arguments;picocli-generated-man-section-exit-status;picocli-generated-man-section-footer,leveloffset=+1]
-
-[[cli-eval]]
-== graalnix eval
-
-include::_cli/graalnix-eval.adoc[tags=picocli-generated-man-section-synopsis;picocli-generated-man-section-description;picocli-generated-man-section-options;picocli-generated-man-section-arguments;picocli-generated-man-section-exit-status;picocli-generated-man-section-footer,leveloffset=+1]
-
-[[cli-drv-path]]
-== graalnix drv-path
-
-include::_cli/graalnix-drv-path.adoc[tags=picocli-generated-man-section-synopsis;picocli-generated-man-section-description;picocli-generated-man-section-options;picocli-generated-man-section-arguments;picocli-generated-man-section-exit-status;picocli-generated-man-section-footer,leveloffset=+1]
+:relfileprefix: cli/
+include::cli/graalnix.adoc[tags=picocli-generated-man-section-synopsis;picocli-generated-man-section-options;picocli-generated-man-section-commands,leveloffset=+1]
+:relfileprefix!:
 
 == treefmt
 

@@ -20,14 +20,14 @@ import picocli.CommandLine;
 import picocli.codegen.docgen.manpage.ManPageGenerator;
 
 /**
- * Generates a man page in docs/_cli/ for each command with picocli's ManPageGenerator. When one is out of date, the
+ * Generates a man page in docs/cli/ for each command with picocli's ManPageGenerator. When one is out of date, the
  * test rewrites it and fails, so that the new version gets committed.
  */
 class CliDocsTest {
     /** Tests run from the project root; the Nix build of the tests includes the generated files. */
     private static final Path DOCS = Path.of("docs");
 
-    private static final Path GENERATED = DOCS.resolve("_cli");
+    private static final Path GENERATED = DOCS.resolve("cli");
 
     @Test
     void docsAreUpToDate() throws IOException {
