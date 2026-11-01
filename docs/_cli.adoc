@@ -3,7 +3,12 @@
 ----
 graalnix eval [--strict] [--json] [--raw] (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
 graalnix drv-path (-E EXPR | FILE) [-A ATTR] [--arg NAME EXPR] [--argstr NAME VALUE]
+graalnix format [--width N] [--indent N] [--strict] [FILE...]
+graalnix check [FILE...]
+graalnix fix [--width N] [--indent N] [--strict] [FILE...]
 ----
+
+`-h` or `--help` after any command prints its options.
 
 == Commands
 
@@ -15,6 +20,16 @@ Evaluates the expression and prints the result in the same format as
 Evaluates the expression to a derivation and prints its `drvPath`, like
 `nix-instantiate`. When the derivation's `outputName` is not `out`, the path is
 followed by `!<output>`.
+
+`format`::
+Formats the files in place, as nixfmt does.
+
+`check`::
+Prints the linter's findings, one per line as
+`FILE:LINE:COLUMN: SEVERITY[RULE]: MESSAGE`, and changes no file.
+
+`fix`::
+Applies the linter's fixes to the files in place, then formats them.
 
 == Input
 
@@ -75,6 +90,47 @@ Runtime compilation is off by default: on nixpkgs it made evaluations 4 to 10%
 slower for 1.5 times the CPU and memory. Pass `--engine.Compilation=true` to turn
 it back on.
 
+== Files
+
+These apply to `format`, `check` and `fix`.
+
+`FILE...`::
+The files to process. A directory stands for every `.nix` file below it.
+Without any, the command reads standard input, and `format` and `fix` print
+the result to standard output.
+
+`--width N`::
+Fits lines in `N` columns where possible, 100 by default.
+
+`--indent N`::
+Indents by `N` spaces, 2 by default.
+
+`--strict`::
+Makes the output depend less on how the input was laid out, like
+`nixfmt --strict`.
+
+`-q`, `--quiet`::
+For `format` and `fix`, prints only errors, not the files rewritten and the
+summary.
+
+Files are read as UTF-8, and one that is not is refused. A file is written only
+when its content changes. `format` and `fix` name each file they rewrite on
+standard error, then a count of the files changed, unchanged and failed, and the time taken. A file that fails, such as one that does not parse,
+is reported on standard error, and the other files are still processed.
+
+`format` and `fix` follow the
+https://treefmt.com/latest/reference/formatter-spec/[treefmt formatter spec]:
+
+[source,toml]
+----
+[formatter.graalnix]
+command = "graalnix"
+options = ["fix"]
+includes = ["*.nix"]
+----
+
 == Exit status
 
-`0` on success, `1` when the evaluation fails and `2` on a usage error.
+`0` on success and `2` on a usage error. `1` when the evaluation fails, when a
+file cannot be read or does not parse, or when `check` finds an error or a
+warning. Hints alone leave `check` at `0`.

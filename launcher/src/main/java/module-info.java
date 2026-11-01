@@ -1,12 +1,14 @@
 /**
  * Command-line launcher for graalnix.
  *
- * <p>Evaluates Nix expressions and computes derivation paths like nix-instantiate, without writing to the store.
+ * <p>Evaluates Nix expressions and computes derivation paths like nix-instantiate, without writing to the store, and
+ * formats and lints Nix files.
  *
  * @jenesis.release 25
  * @jenesis.bom pin-graalnix.properties
  * @jenesis.main org.graalnix.launcher.Main
  * @jenesis.native org.graalvm.truffle org.graalvm.truffle.runtime
+ * @jenesis.plugin maven/info.picocli/picocli-codegen
  * @jenesis.pin palantir/module/build.jenesis 0.17.0 SHA-256/d3f83ea608953c2cb1745b75d34b66a0f0a89dc78944f11430f2cfc9bcbe6437
  * @jenesis.pin palantir/module/build.jenesis.plugin.palantir 0.1.0 SHA-256/7ed90f505775e2a785967c91f62cb7ce07de44377225cba2f3d4973908836401
  * @jenesis.pin palantir:tool/maven/com.fasterxml.jackson.core/jackson-annotations 2.22 SHA-256/21ddb598807d3a51a876704eb979d9296e1c6a6f47ab1826ff88c6d6a127a2d0
@@ -25,11 +27,22 @@
  * @jenesis.pin palantir:tool/maven/com.palantir.javaformat/palantir-java-format-spi 2.103.0 SHA-256/16f8d1c4b9d9d4a9faf93c27254249d65899b30a311493d2469f65ea784636ca
  * @jenesis.pin palantir:tool/maven/org.functionaljava/functionaljava 5.0 SHA-256/377ad140e7d26ba04fadf219b09d7e1c74bc0232fa4010b20c1c79db11f9670e
  * @jenesis.pin palantir:tool/maven/org.jspecify/jspecify 1.0.1 SHA-256/070d75f261fe4c5b8202508366715f7f2d4660f88c8ef7e6d3575e48c9683b66
+ * @jenesis.pin plugin/maven/info.picocli/picocli 4.7.7 SHA-256/f86e30fffd10d2b13b8caa8d4b237a7ee61f2ffccf5b1941de718b765d235bf8
+ * @jenesis.pin plugin/maven/info.picocli/picocli-codegen 4.7.7 SHA-256/6dae68232ce1d152b8e474d5bd1888d100bc8cea2ab9307a4e5aa04e1357d261
  */
 module org.graalnix.launcher {
+    requires info.picocli;
+    requires org.graalnix.format;
+    requires org.graalnix.lint;
+    requires org.graalnix.parser;
     requires org.graalvm.polyglot;
     // Required only to be on the module path, where the polyglot engine finds them as services.
     requires org.graalnix;
     requires org.graalvm.truffle.runtime;
     requires com.oracle.truffle.tools.profiler;
+
+    exports org.graalnix.launcher;
+
+    opens org.graalnix.launcher to
+            info.picocli;
 }

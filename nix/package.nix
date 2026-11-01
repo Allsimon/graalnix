@@ -14,8 +14,10 @@ let
         [
           ../build/jenesis
           ../build.jenesis
+          ../format/src/main
           ../language/src/main
           ../launcher/src/main
+          ../lint/src/main
           ../parser/src/main
           ../store/src/main
         ]
@@ -24,9 +26,8 @@ let
     };
   testPaths = [
     ../language/src/test
-    ../format/src/main
+    ../launcher/src/test
     ../format/src/test
-    ../lint/src/main
     ../lint/src/test
     ../docs/_lint-rules.adoc
   ];
@@ -63,7 +64,7 @@ let
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-S6SSaQn7inQ1NFzkS27TD2PMIL05LoPdrAc6Ywp83UE=";
+    outputHash = "sha256-q/EtY/ex3S8wJOyjPUXY7IAoKd4mfz8/N0KZguDEalo=";
   };
 
   offline = ''
