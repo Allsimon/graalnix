@@ -44,10 +44,11 @@ mark.hint { text-decoration: underline dotted var(--hint) 2px; }
 #findings li { padding: .2em 1em; cursor: pointer; }
 #findings li:hover { background: #8882; }
 #findings .where { font-family: ui-monospace, monospace; color: var(--muted); }
-#findings .error { color: var(--error); }
-#findings .warning { color: var(--warning); }
-#findings .hint { color: var(--hint); }
-#findings .rule { font-family: ui-monospace, monospace; }
+:is(#findings, #tooltip) .error { color: var(--error); }
+:is(#findings, #tooltip) .warning { color: var(--warning); }
+:is(#findings, #tooltip) .hint { color: var(--hint); }
+:is(#findings, #tooltip) .rule { font-family: ui-monospace, monospace; }
+#tooltip { position: fixed; z-index: 1; max-width: min(40em, 90vw); margin: 0; padding: .3em .6em; list-style: none; font-size: 13px; background: Canvas; border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 2px 8px #0003; pointer-events: none; }
 #findings .none { color: var(--muted); cursor: default; }
 #findings .none:hover { background: none; }
 @media (max-width: 800px) {
@@ -121,6 +122,7 @@ stdenv.mkDerivation rec {
   </section>
 </main>
 <ul id="findings" aria-live="polite"></ul>
+<ul id="tooltip" hidden></ul>
 <script src="graalnix.js"></script>
 <script>
 "use strict";
@@ -128,6 +130,7 @@ const source = document.getElementById("source");
 const output = document.getElementById("output");
 const marks = document.getElementById("marks");
 const findings = document.getElementById("findings");
+const tooltip = document.getElementById("tooltip");
 const status = document.getElementById("status");
 const controls = document.querySelectorAll("header input");
 const mode = () => document.querySelector("input[name=mode]:checked").value;
@@ -181,7 +184,7 @@ function paint(target, text, tokens, diagnostics) {
       if (start >= text.length || text[start] === "\n") start = Math.max(0, start - 1);
       end = start + 1;
     }
-    return { start, end, severity: d.severity };
+    return { start, end, severity: d.severity, finding: d };
   });
   const cuts = [...new Set([0, text.length, ...tokens.flatMap(t => [t[0], t[1]]), ...ranges.flatMap(r => [r.start, r.end])])]
     .filter(i => i <= text.length).sort((a, b) => a - b);
@@ -191,13 +194,15 @@ function paint(target, text, tokens, diagnostics) {
     const [from, to] = [cuts[i], cuts[i + 1]];
     while (t < tokens.length && tokens[t][1] <= from) t++;
     const kind = t < tokens.length && tokens[t][0] <= from ? tokens[t][2] : null;
-    const severity = ranges.filter(r => r.start <= from && to <= r.end)
-      .reduce((worst, r) => !worst || RANK[r.severity] > RANK[worst] ? r.severity : worst, null);
+    const covering = ranges.filter(r => r.start <= from && to <= r.end)
+      .sort((a, b) => RANK[b.severity] - RANK[a.severity]);
+    const severity = covering[0]?.severity;
     let part = text.slice(from, to);
     if (kind) part = span(kind, part);
     if (severity) {
       const mark = document.createElement("mark");
       mark.className = severity;
+      mark.findings = covering.map(r => r.finding);
       mark.append(part);
       part = mark;
     }
@@ -212,6 +217,24 @@ function showMarks() {
   // Extra lines let the backdrop scroll as far as the textarea, whose horizontal scrollbar takes height.
   marks.append("\n\n\n");
   syncScroll();
+}
+
+function hover(event) {
+  const { clientX: x, clientY: y } = event;
+  const mark = [...marks.querySelectorAll("mark")].find(m =>
+    [...m.getClientRects()].some(r => r.left <= x && x < r.right && r.top <= y && y < r.bottom));
+  if (!mark) {
+    tooltip.hidden = true;
+    return;
+  }
+  tooltip.replaceChildren(...mark.findings.map(d => item("", [
+    span(d.severity, d.severity),
+    span("rule", "[" + d.rule + "] "),
+    d.message + (d.fixable ? " (fixable)" : ""),
+  ])));
+  tooltip.hidden = false;
+  tooltip.style.left = Math.max(0, Math.min(x + 12, innerWidth - tooltip.offsetWidth - 4)) + "px";
+  tooltip.style.top = (y + 20 + tooltip.offsetHeight < innerHeight ? y + 20 : y - 8 - tooltip.offsetHeight) + "px";
 }
 
 function syncScroll() {
@@ -264,6 +287,8 @@ source.addEventListener("input", () => {
   pending = setTimeout(refresh, 150);
 });
 source.addEventListener("scroll", syncScroll);
+source.addEventListener("mousemove", hover);
+for (const event of ["mouseleave", "scroll", "input"]) source.addEventListener(event, () => tooltip.hidden = true);
 new ResizeObserver(syncScroll).observe(source);
 for (const control of controls) control.addEventListener("input", refresh);
 refresh();
