@@ -61,6 +61,8 @@ class CliDocsTest {
             ManPageGenerator.writeSingleManPage(pw, cmd.getCommandSpec());
         }
         pages.put(cmd.getCommandSpec().qualifiedName("-") + ".adoc", out.toString());
-        for (CommandLine sub : cmd.getSubcommands().values()) collect(sub, pages);
+        for (CommandLine sub : cmd.getSubcommands().values()) {
+            if (!sub.getCommandSpec().usageMessage().hidden()) collect(sub, pages);
+        }
     }
 }

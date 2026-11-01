@@ -4,6 +4,7 @@
   jdk25_headless,
   graalvmPackages,
   fetchurl,
+  installShellFiles,
   linkFarm,
   makeWrapper,
   unzip,
@@ -105,6 +106,19 @@ let
     + "build/jenesis/Make.java build/modules/compose/module/package-module-${module}+src+main+java";
   output = module: "target/build/modules/compose/module/package-module-${module}+src+main+java";
 
+  # picocli's script works in zsh only through bashcompinit, so the zsh function sources it.
+  # Completion runs with NO_aliases, so its compopt alias does not expand.
+  completions = ''
+    $out/bin/graalnix generate-completion > graalnix.bash
+    cat > _graalnix <<EOF
+    #compdef graalnix
+    compopt() { :; }
+    source $out/share/bash-completion/completions/graalnix.bash
+    _bash_complete -F _complete_graalnix -o default
+    EOF
+    installShellCompletion graalnix.bash _graalnix
+  '';
+
   jvm =
     {
       pname,
@@ -118,6 +132,7 @@ let
 
       nativeBuildInputs = [
         jdk
+        installShellFiles
         makeWrapper
         unzip
       ];
@@ -136,6 +151,7 @@ let
         unzip -q ${output module}/bundle/output/bundle/bundle.zip jars/'*' application.unix.args -d $out/share/graalnix
         sed -i -E "s#([\":])jars/#\1$out/share/graalnix/jars/#g" $out/share/graalnix/application.unix.args
         makeWrapper ${jdk}/bin/java $out/bin/graalnix --add-flags @$out/share/graalnix/application.unix.args
+        ${completions}
         runHook postInstall
       '';
     };
@@ -152,7 +168,10 @@ let
       inherit pname src;
       version = "0.1.0";
 
-      nativeBuildInputs = [ graalvmPackages.graalvm-ce-musl ];
+      nativeBuildInputs = [
+        graalvmPackages.graalvm-ce-musl
+        installShellFiles
+      ];
 
       buildPhase = ''
         runHook preBuild
@@ -165,6 +184,7 @@ let
       installPhase = ''
         runHook preInstall
         install -Dm755 ${output module}/native-image/output/native/org.graalnix.${module} $out/bin/graalnix
+        ${completions}
         runHook postInstall
       '';
 

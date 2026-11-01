@@ -11,7 +11,7 @@ import picocli.CommandLine.ScopeType;
 @Command(
         name = "graalnix",
         description = "Format and lint Nix files.",
-        subcommands = {Format.class, Check.class, Fix.class})
+        subcommands = {Format.class, Check.class, Fix.class, Completion.class})
 public final class Main {
     private static final long STACK_SIZE = 1L << 30;
 
