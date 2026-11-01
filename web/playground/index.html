@@ -18,6 +18,13 @@ section { display: grid; grid-template-rows: auto 1fr; min-height: 0; min-width:
 section + section { border-left: 1px solid var(--border); }
 h2 { margin: 0; padding: .3em 1em; font-size: .85em; font-weight: normal; color: var(--muted); border-bottom: 1px solid var(--border); }
 textarea { width: 100%; height: 100%; border: 0; padding: 1em; resize: none; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; outline: none; background: transparent; color: inherit; white-space: pre; }
+.editor { position: relative; min-height: 0; }
+.editor textarea, #marks { position: absolute; inset: 0; margin: 0; }
+#marks { padding: 1em calc(1em + 20px) 1em 1em; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; white-space: pre; overflow: hidden; color: transparent; pointer-events: none; }
+mark { background: none; color: transparent; text-decoration: underline wavy; text-decoration-skip-ink: none; text-underline-offset: 3px; }
+mark.error { text-decoration-color: var(--error); }
+mark.warning { text-decoration-color: var(--warning); }
+mark.hint { text-decoration: underline dotted var(--hint) 2px; }
 #output.failed { color: var(--error); white-space: pre-wrap; }
 #findings { margin: 0; padding: .4em 0; list-style: none; max-height: 30vh; overflow: auto; border-top: 1px solid var(--border); font-size: 14px; }
 #findings li { padding: .2em 1em; cursor: pointer; }
@@ -49,6 +56,8 @@ textarea { width: 100%; height: 100%; border: 0; padding: 1em; resize: none; fon
   <section>
     <h2>Input</h2>
     <!-- pkgs/by-name/kc/kcgi/package.nix of nixpkgs 718f670e845328e9c2cecdd832835712b2cbd065 -->
+    <div class="editor">
+    <pre id="marks" aria-hidden="true"></pre>
     <textarea id="source" spellcheck="false" aria-label="Nix source">{
   lib,
   stdenv,
@@ -90,6 +99,7 @@ stdenv.mkDerivation rec {
   };
 }
 </textarea>
+    </div>
   </section>
   <section>
     <h2 id="title">Fixed and formatted</h2>
@@ -102,6 +112,7 @@ stdenv.mkDerivation rec {
 "use strict";
 const source = document.getElementById("source");
 const output = document.getElementById("output");
+const marks = document.getElementById("marks");
 const findings = document.getElementById("findings");
 const status = document.getElementById("status");
 const controls = document.querySelectorAll("header input");
@@ -141,8 +152,47 @@ function span(className, text) {
   return s;
 }
 
+const RANK = { hint: 1, warning: 2, error: 3 };
+
+function showMarks(text, diagnostics) {
+  const ranges = diagnostics.map(d => {
+    let { start, end } = d;
+    if (end <= start) {
+      if (start >= text.length || text[start] === "\n") start = Math.max(0, start - 1);
+      end = start + 1;
+    }
+    return { start, end, severity: d.severity };
+  });
+  const cuts = [...new Set([0, text.length, ...ranges.flatMap(r => [r.start, r.end])])]
+    .filter(i => i <= text.length).sort((a, b) => a - b);
+  const parts = [];
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const [from, to] = [cuts[i], cuts[i + 1]];
+    const severity = ranges.filter(r => r.start <= from && to <= r.end)
+      .reduce((worst, r) => !worst || RANK[r.severity] > RANK[worst] ? r.severity : worst, null);
+    const chunk = text.slice(from, to);
+    if (severity) {
+      const mark = document.createElement("mark");
+      mark.className = severity;
+      mark.textContent = chunk;
+      parts.push(mark);
+    } else {
+      parts.push(chunk);
+    }
+  }
+  // Extra lines let the backdrop scroll as far as the textarea, whose horizontal scrollbar takes height.
+  marks.replaceChildren(...parts, "\n\n\n");
+  syncScroll();
+}
+
+function syncScroll() {
+  marks.scrollTop = source.scrollTop;
+  marks.scrollLeft = source.scrollLeft;
+}
+
 function showFindings(text) {
   const result = JSON.parse(self.lint(text));
+  showMarks(text, result.diagnostics ?? []);
   findings.replaceChildren();
   if (result.error) {
     findings.append(item("error", [result.error.message]));
@@ -183,6 +233,8 @@ source.addEventListener("input", () => {
   clearTimeout(pending);
   pending = setTimeout(refresh, 150);
 });
+source.addEventListener("scroll", syncScroll);
+new ResizeObserver(syncScroll).observe(source);
 for (const control of controls) control.addEventListener("input", refresh);
 refresh();
 </script>
