@@ -8,8 +8,10 @@ import build.jenesis.BuildStepArgument;
 import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.ObservabilityEngine;
 import build.jenesis.PathPlacement;
+import build.jenesis.Permits;
 import build.jenesis.Pinning;
 import build.jenesis.Repository;
 import build.jenesis.Resolver;
@@ -25,7 +27,8 @@ import javax.lang.model.SourceVersion;
 public class TestModule implements BuildExecutorModule {
 
     public static final String REQUIRED = "required", ARTIFACTS = "artifacts", EXECUTED = "executed";
-    private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies";
+    private static final String RESOLVED = "resolved", DEPENDENCIES = "dependencies", FAILED = "failed.properties";
+    private static final ConcurrentMap<Integer, Permits> PERMITS = new ConcurrentHashMap<>();
 
     private final TestFramework framework;
     private final List<TestFramework> frameworks;
@@ -48,7 +51,7 @@ public class TestModule implements BuildExecutorModule {
     private final boolean reporting;
     private final String group;
     private final List<ObservabilityEngine> observers;
-    private final String incrementalDigest;
+    private final Mode mode;
     private final ProcessBuildStep.Terms terms;
     private final boolean skip;
 
@@ -74,7 +77,7 @@ public class TestModule implements BuildExecutorModule {
                 false,
                 "main",
                 List.of(),
-                null,
+                Mode.ALPHABETIC,
                 new ProcessBuildStep.Terms(),
                 false);
     }
@@ -82,42 +85,63 @@ public class TestModule implements BuildExecutorModule {
     public static TestModule ofEnvironment(Environment environment,
                                     Map<String, Repository> repositories,
                                     Map<String, Resolver> resolvers) {
+        ProcessBuildStep.Terms terms = ProcessBuildStep.Terms.ofEnvironment(environment, "tests");
+        int concurrency = environment.number("test.concurrency", 0, Setting.PROJECT);
+        if (concurrency < 0) {
+            throw new IllegalArgumentException("jenesis.test.concurrency is " + concurrency
+                    + ", but names how many test runs execute at once: 0 or more, 0 bounding them by"
+                    + " jenesis.process.concurrency alone");
+        } else if (concurrency > 0) {
+            terms = terms.permits(Permits.compound(PERMITS.computeIfAbsent(concurrency, Permits::of), terms.permits()));
+        }
         return new TestModule(null,
                 List.of(),
                 defaultIsTest(),
                 null,
                 resolvers,
                 Dependencies.ofEnvironment(environment, repositories, resolvers),
-                environment.flag("test.jars", true),
+                environment.flag("test.jars", true, Setting.PROJECT),
                 true,
                 null,
                 PathPlacement.CLASS_PATH,
                 null,
-                environment.getProperty("test.filter"),
-                environment.getProperty("test.exclude"),
-                environment.getProperty("test.tag"),
+                environment.getProperty("test.filter", Setting.PROJECT),
+                environment.getProperty("test.exclude", Setting.PROJECT),
+                environment.getProperty("test.tag", Setting.PROJECT),
                 null,
                 List.of(),
-                environment.flag("test.force"),
-                environment.flag("test.parallel"),
-                environment.flag("test.reporting"),
+                environment.flag("test.force", Setting.PROJECT),
+                environment.flag("test.parallel", Setting.PROJECT),
+                environment.flag("test.reporting", Setting.PROJECT),
                 "main",
                 List.of(),
-                incrementalDigest(environment.getProperty("test.incremental")),
-                ProcessBuildStep.Terms.ofEnvironment(environment, "tests"),
-                environment.flag("test.skip"));
+                Mode.of(environment.value("test.mode", "alphabetic", Setting.PROJECT)),
+                terms,
+                environment.flag("test.skip", Setting.PROJECT));
     }
 
-    private static String incrementalDigest(String property) {
-        if (property == null || property.strip().equals("false")) {
-            return null;
-        } else if (property.isBlank() || property.strip().equals("true")) {
-            return "MD5";
-        } else if (!Security.getAlgorithms("MessageDigest").contains(property.strip().toUpperCase(Locale.ROOT))) {
-            throw new IllegalArgumentException("jenesis.test.incremental is true, false or the name of a message digest,"
-                    + " one of " + new TreeSet<>(Security.getAlgorithms("MessageDigest")) + ": " + property);
+    public enum Mode {
+
+        ALPHABETIC, INCREMENTAL, PRIORITIZED, FAILED, FAILED_FIRST;
+
+        public static Mode of(String value) {
+            return switch (value) {
+                case "alphabetic" -> ALPHABETIC;
+                case "incremental" -> INCREMENTAL;
+                case "prioritized" -> PRIORITIZED;
+                case "failed" -> FAILED;
+                case "failedfirst" -> FAILED_FIRST;
+                default -> throw new IllegalArgumentException("jenesis.test.mode is " + value
+                        + " - expected alphabetic, to run every test by class name, incremental, to run only the"
+                        + " tests a change reaches, prioritized, to run those first and every other test after,"
+                        + " failed, to run only the classes that failed in the run before, or failedfirst, to run"
+                        + " those first and every other test after");
+            };
         }
-        return property.strip();
+
+        public boolean recordsFailures() {
+            return this == FAILED || this == FAILED_FIRST;
+        }
     }
 
     private static Predicate<String> defaultIsTest() {
@@ -151,7 +175,7 @@ public class TestModule implements BuildExecutorModule {
                        boolean reporting,
                        String group,
                        List<ObservabilityEngine> observers,
-                       String incrementalDigest,
+                       Mode mode,
                        ProcessBuildStep.Terms terms,
                        boolean skip) {
         this.skip = skip;
@@ -176,7 +200,7 @@ public class TestModule implements BuildExecutorModule {
         this.reporting = reporting;
         this.group = group;
         this.observers = observers;
-        this.incrementalDigest = incrementalDigest;
+        this.mode = mode;
         this.terms = terms;
     }
 
@@ -202,7 +226,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -229,7 +253,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -256,7 +280,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -283,7 +307,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -310,7 +334,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -337,7 +361,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -364,7 +388,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -391,7 +415,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -418,7 +442,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -445,7 +469,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -472,7 +496,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -499,7 +523,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -526,7 +550,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -563,7 +587,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -590,7 +614,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -617,7 +641,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -644,8 +668,35 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
+                skip);
+    }
+
+    public TestModule permits(Permits permits) {
+        return new TestModule(framework,
+                frameworks,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                mode,
+                terms.permits(permits),
                 skip);
     }
 
@@ -671,13 +722,9 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
-    }
-
-    public TestModule observe(ObservabilityEngine... observers) {
-        return observe(List.of(observers));
     }
 
     public TestModule observe(List<ObservabilityEngine> observers) {
@@ -702,7 +749,34 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
+                terms,
+                skip);
+    }
+
+    public TestModule mode(Mode mode) {
+        return new TestModule(framework,
+                frameworks,
+                isTest,
+                factory,
+                resolvers,
+                dependencies,
+                jarsOnly,
+                requireFramework,
+                pinning,
+                pathPlacement,
+                moduleName,
+                filter,
+                exclude,
+                tag,
+                engines,
+                scan,
+                force,
+                parallel,
+                reporting,
+                group,
+                observers,
+                mode,
                 terms,
                 skip);
     }
@@ -729,7 +803,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -756,7 +830,7 @@ public class TestModule implements BuildExecutorModule {
                 reporting,
                 group,
                 observers,
-                incrementalDigest,
+                mode,
                 terms,
                 skip);
     }
@@ -811,7 +885,7 @@ public class TestModule implements BuildExecutorModule {
                         reporting,
                         group,
                         observers,
-                        incrementalDigest),
+                        mode),
                 Stream.concat(upstream.stream(), Stream.of(DEPENDENCIES)));
     }
 
@@ -934,7 +1008,6 @@ public class TestModule implements BuildExecutorModule {
         public Scope {
             filter = filter == null || filter.isBlank() ? null : filter;
             exclude = exclude == null || exclude.isBlank() ? null : exclude;
-            covered = List.copyOf(covered);
         }
 
         public Scope(String filter, List<TestTags> covered) {
@@ -1007,7 +1080,7 @@ public class TestModule implements BuildExecutorModule {
         private final boolean reporting;
         private final String group;
         private final List<ObservabilityEngine> observers;
-        private final transient String incrementalDigest;
+        private final transient Mode mode;
 
         private Run(ProcessBuildStep.Terms terms,
                     Function<List<String>, ProcessHandler.OfProcess> factory,
@@ -1027,7 +1100,7 @@ public class TestModule implements BuildExecutorModule {
                     boolean reporting,
                     String group,
                     List<ObservabilityEngine> observers,
-                    String incrementalDigest) {
+                    Mode mode) {
             super(factory == null ? ProcessHandler.OfProcess.ofJavaHome("bin/java") : factory,
                   pathPlacement,
                   jarsOnly,
@@ -1047,7 +1120,7 @@ public class TestModule implements BuildExecutorModule {
             this.reporting = reporting;
             this.group = group;
             this.observers = observers;
-            this.incrementalDigest = incrementalDigest;
+            this.mode = mode;
         }
 
         @Override
@@ -1058,7 +1131,7 @@ public class TestModule implements BuildExecutorModule {
         @Override
         protected Optional<String> diagnosis(BuildStepContext context) {
             Path reports = context.next().resolve(BuildStep.REPORTS + "tests");
-            return reporting && Files.isDirectory(reports)
+            return (reporting || mode.recordsFailures()) && Files.isDirectory(reports)
                     ? Optional.of("The reports of the test run are in " + reports)
                     : Optional.empty();
         }
@@ -1119,15 +1192,7 @@ public class TestModule implements BuildExecutorModule {
                                                         BuildStepContext context,
                                                         SequencedMap<String, BuildStepArgument> arguments)
                 throws IOException {
-            List<Path> folders = arguments.values().stream()
-                    .filter(argument -> !argument.removed())
-                    .map(BuildStepArgument::folder)
-                    .toList();
-            TestFramework resolved = (framework != null
-                    ? framework
-                    : TestFrameworks.detect(frameworks, folders)
-                            .orElseThrow(() -> new IllegalArgumentException("No test framework found")))
-                    .runningOn(TestFrameworks.jars(folders));
+            TestFramework resolved = framework(arguments);
             String path = null, compiledFrom = null;
             for (BuildStepArgument argument : arguments.values()) {
                 if (argument.removed()) {
@@ -1422,12 +1487,38 @@ public class TestModule implements BuildExecutorModule {
                 return CompletableFuture.completedFuture(null);
             }
             SequencedSet<String> selection = matchedClasses;
-            if (incrementalDigest != null && filter == null && exclude == null && tags.all() && ran.isEmpty() && !matchedClasses.isEmpty()) {
+            if (mode == Mode.INCREMENTAL
+                    && filter == null
+                    && exclude == null
+                    && tags.all()
+                    && ran.isEmpty()
+                    && !matchedClasses.isEmpty()) {
                 SequencedSet<String> narrowed = selected(arguments, context, matchedClasses);
                 if (narrowed != null && narrowed.isEmpty()) {
                     return CompletableFuture.completedFuture(null);
                 } else if (narrowed != null) {
                     selection = narrowed;
+                }
+            } else if (mode == Mode.PRIORITIZED && !matchedClasses.isEmpty()) {
+                SequencedSet<String> reached = selected(arguments, context, matchedClasses);
+                if (reached != null && !reached.isEmpty()) {
+                    selection = new LinkedHashSet<>(reached);
+                    selection.addAll(matchedClasses);
+                }
+            } else if (mode.recordsFailures() && Files.isRegularFile(context.persistent().resolve(FAILED))) {
+                SequencedSet<String> failed = new TreeSet<>();
+                SequencedProperties recorded = SequencedProperties.ofFiles(context.persistent().resolve(FAILED));
+                for (String test : recorded.stringPropertyNames()) {
+                    String type = test.substring(0, test.indexOf('#'));
+                    if (matchedClasses.contains(type)) {
+                        failed.add(type);
+                    }
+                }
+                if (!failed.isEmpty()) {
+                    selection = new LinkedHashSet<>(failed);
+                    if (mode == Mode.FAILED_FIRST) {
+                        selection.addAll(matchedClasses);
+                    }
                 }
             }
             commands.addAll(resolved.engines(resolved.tags(resolved.arguments(
@@ -1436,8 +1527,41 @@ public class TestModule implements BuildExecutorModule {
                     selection,
                     matchedMethods,
                     parallel,
-                    reporting), tags, ran), engines));
+                    reporting || mode.recordsFailures()), tags, ran), engines));
             return CompletableFuture.completedFuture(commands);
+        }
+
+        @Override
+        public boolean acceptableExitCode(int code,
+                                          Executor executor,
+                                          BuildStepContext context,
+                                          SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            if (mode.recordsFailures()) {
+                Optional<SequencedMap<String, SequencedSet<String>>> failed = framework(arguments)
+                        .failed(context.supplement(), context.next());
+                Path recorded = context.persistent().resolve(FAILED);
+                if (failed.isPresent() && failed.get().isEmpty()) {
+                    Files.deleteIfExists(recorded);
+                } else if (failed.isPresent()) {
+                    SequencedProperties tests = new SequencedProperties();
+                    failed.get().forEach((type, methods) -> methods.forEach(method ->
+                            tests.setProperty(type + "#" + method, "")));
+                    tests.store(recorded);
+                }
+            }
+            return super.acceptableExitCode(code, executor, context, arguments);
+        }
+
+        private TestFramework framework(SequencedMap<String, BuildStepArgument> arguments) throws IOException {
+            List<Path> folders = arguments.values().stream()
+                    .filter(argument -> !argument.removed())
+                    .map(BuildStepArgument::folder)
+                    .toList();
+            return (framework != null
+                    ? framework
+                    : TestFrameworks.detect(frameworks, folders)
+                            .orElseThrow(() -> new IllegalArgumentException("No test framework found")))
+                    .runningOn(TestFrameworks.jars(folders));
         }
 
         private static boolean holdsTests(TestFramework framework,
@@ -1463,7 +1587,7 @@ public class TestModule implements BuildExecutorModule {
                                               SequencedSet<String> candidates) throws IOException {
             MessageDigest digest;
             try {
-                digest = MessageDigest.getInstance(incrementalDigest);
+                digest = MessageDigest.getInstance("SHA-256");
             } catch (NoSuchAlgorithmException e) {
                 throw new IllegalStateException(e);
             }

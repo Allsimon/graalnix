@@ -1,6 +1,7 @@
 package build.jenesis.maven;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Pinning;
 import module java.xml;
 import build.jenesis.BuildExecutor;
@@ -46,7 +47,6 @@ import static java.util.Objects.requireNonNull;
 public class MavenProject implements BuildExecutorModule {
 
     public static final String POM = "pom/", MAVEN = "maven/", BOM = "bom/";
-    public static final String EXPRESSIONS = "expressions.properties", SCOPES = "scopes.properties";
     private static final String SCAN = "scan", POM_METADATA = "metadata.", RELOCATION = "relocation.", BOMS = "boms",
             POMS = "poms", SKIPPED = "skipped.properties", INDEX = "index.properties";
     private static final Set<String> JARS = Set.of("jar", "bundle"), AGGREGATES = Set.of("pom", "bom");
@@ -66,6 +66,7 @@ public class MavenProject implements BuildExecutorModule {
     private final Palette palette;
     private final Function<List<Path>, SequencedSet<Path>> configurations;
     private final List<String> sources;
+    private final boolean unified;
 
     public MavenProject(Path root,
                         String prefix,
@@ -80,7 +81,8 @@ public class MavenProject implements BuildExecutorModule {
                 null,
                 Palette.NONE,
                 OWN_CONFIGURATIONS,
-                List.of());
+                List.of(),
+                false);
     }
 
     public static MavenProject ofEnvironment(Environment environment,
@@ -88,11 +90,12 @@ public class MavenProject implements BuildExecutorModule {
                                       String prefix,
                                       MavenRepository repository,
                                       MavenResolver resolver) {
-        List<String> sources = environment.entries("maven.sources");
+        List<String> sources = environment.entries("maven.sources", Setting.PROJECT);
         return new MavenProject(root, prefix, repository, resolver)
                 .sources(sources == null ? List.of() : sources)
+                .unified(environment.flag("maven.unified", false, Setting.PROJECT))
                 .platform(Platform.ofEnvironment(environment))
-                .printing(environment.flag("print.progress", true) ? environment.out() : null,
+                .printing(environment.flag("print.progress", true, Setting.PROJECT) ? environment.out() : null,
                         Palette.ofEnvironment(environment));
     }
 
@@ -105,7 +108,8 @@ public class MavenProject implements BuildExecutorModule {
                          Consumer<String> printing,
                          Palette palette,
                          Function<List<Path>, SequencedSet<Path>> configurations,
-                         List<String> sources) {
+                         List<String> sources,
+                         boolean unified) {
         this.root = root;
         this.group = group;
         this.prefix = prefix;
@@ -116,18 +120,19 @@ public class MavenProject implements BuildExecutorModule {
         this.palette = palette;
         this.configurations = configurations;
         this.sources = sources;
+        this.unified = unified;
     }
 
     public MavenProject group(String group) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject platform(Platform platform) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject printing(Consumer<String> printing, Palette palette) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject sources(List<String> sources) {
@@ -146,11 +151,16 @@ public class MavenProject implements BuildExecutorModule {
                 printing,
                 palette,
                 configurations,
-                List.copyOf(sources));
+                List.copyOf(sources),
+                unified);
+    }
+
+    public MavenProject unified(boolean unified) {
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public MavenProject configurations(Function<List<Path>, SequencedSet<Path>> configurations) {
-        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources);
+        return new MavenProject(root, group, prefix, repository, resolver, platform, printing, palette, configurations, sources, unified);
     }
 
     public static BuildExecutorModule make(Environment environment,
@@ -194,8 +204,15 @@ public class MavenProject implements BuildExecutorModule {
                     for (int index = 0; index < spdx.size(); index++) {
                         spdxInherited.add(BuildExecutorModule.PREVIOUS + MultiProjectModule.SPDX + "-" + index);
                     }
+                    SequencedSet<String> resourceFolders = new LinkedHashSet<>();
+                    for (String key : arguments.sequencedKeySet()) {
+                        String folder = key.substring(key.lastIndexOf('/') + 1);
+                        if (folder.startsWith("resources-")) {
+                            resourceFolders.add(BuildExecutorModule.PREVIOUS + folder);
+                        }
+                    }
                     AssemblyDescriptor packaging = assembler.apply(
-                            new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), Collections.emptyNavigableSet(), spdxInherited, location, test),
+                            new MavenModuleDescriptor(name, dependencies.sequencedKeySet(), resourceFolders, spdxInherited, location, test),
                             repositories,
                             resolvers);
                     return packaging.nest(packaging.build(), PRODUCE, _ -> (buildExecutor, inherited) -> {
@@ -296,7 +313,7 @@ public class MavenProject implements BuildExecutorModule {
         Platform platform = this.platform;
         buildExecutor.addStep(SCAN, new Scan(root));
         buildExecutor.addStep(PREPARE,
-                new Prepare(prefix, resolver, repository, sources),
+                new Prepare(prefix, resolver, repository, sources, unified),
                 Stream.concat(Stream.of(SCAN), inherited.sequencedKeySet().stream()));
         buildExecutor.addModule(BOMS, (boms, prepared) -> {
             SortedSet<String> unstaged = new TreeSet<>();
@@ -579,7 +596,10 @@ public class MavenProject implements BuildExecutorModule {
                                     manifest.getMainAttributes().putValue(PathPlacement.NATIVE_ACCESS, named);
                                 }
                                 if (!aliased.isEmpty()) {
-                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, String.join(",", aliased));
+                                    manifest.getMainAttributes().putValue(PathPlacement.ALIASES, aliased.stream()
+                                            .map(entry -> entry.substring(0, entry.indexOf('=') + 1)
+                                                    + entry.substring(entry.indexOf('/', entry.indexOf('=')) + 1))
+                                            .collect(Collectors.joining(",")));
                                 }
                                 if (preview) {
                                     manifest.getMainAttributes().putValue(PathPlacement.PREVIEW,
@@ -597,6 +617,25 @@ public class MavenProject implements BuildExecutorModule {
                                     exclusionsProperties.setProperty(key, exclusion);
                                 }
                             }
+                            String declaredScopes = properties.getProperty("scopes", "");
+                            if (!declaredScopes.isEmpty()) {
+                                SequencedProperties scopes = new SequencedProperties();
+                                boolean unified = properties.flag("unified");
+                                for (String entry : declaredScopes.split("\t")) {
+                                    int split = entry.indexOf('=');
+                                    String coordinate = entry.substring(0, split), placed = entry.substring(split + 1);
+                                    String exclusion = properties.getProperty("exclusions." + coordinate);
+                                    for (String scope : List.of("compile", "runtime")) {
+                                        if (unified || List.of(placed.split(" ")).contains(scope)) {
+                                            scopes.setProperty(group + "/" + scope + "/" + coordinate, placed);
+                                            if (exclusion != null) {
+                                                exclusionsProperties.setProperty(group + "/" + scope + "/" + coordinate, exclusion);
+                                            }
+                                        }
+                                    }
+                                }
+                                scopes.store(context.next().resolve(BuildStep.SCOPES));
+                            }
                             if (!exclusionsProperties.isEmpty()) {
                                 exclusionsProperties.store(context.next().resolve(BuildStep.EXCLUSIONS));
                             }
@@ -609,26 +648,6 @@ public class MavenProject implements BuildExecutorModule {
                             }
                             if (!managedExclusions.isEmpty()) {
                                 managedExclusions.store(context.next().resolve(BuildStep.MANAGED));
-                            }
-                            SequencedProperties managedScopes = new SequencedProperties();
-                            for (String key : properties.stringPropertyNames()) {
-                                if (key.startsWith("managed.scope.")) {
-                                    managedScopes.setProperty(group + "/" + key.substring("managed.scope.".length()),
-                                            properties.getProperty(key));
-                                }
-                            }
-                            if (!managedScopes.isEmpty()) {
-                                managedScopes.store(context.next().resolve(SCOPES));
-                            }
-                            SequencedProperties expressions = new SequencedProperties();
-                            for (String key : properties.stringPropertyNames()) {
-                                if (key.startsWith("expression.")) {
-                                    expressions.setProperty(key.substring("expression.".length()),
-                                            properties.getProperty(key));
-                                }
-                            }
-                            if (!expressions.isEmpty()) {
-                                expressions.store(context.next().resolve(EXPRESSIONS));
                             }
                             String optionalDependencies = properties.getProperty("optional");
                             if (optionalDependencies != null) {
@@ -873,13 +892,19 @@ public class MavenProject implements BuildExecutorModule {
         private final String prefix;
         private final MavenResolver resolver;
         private final List<String> sources;
+        private final boolean unified;
         private final transient MavenRepository repository;
 
-        private Prepare(String prefix, MavenResolver resolver, MavenRepository repository, List<String> sources) {
+        private Prepare(String prefix,
+                        MavenResolver resolver,
+                        MavenRepository repository,
+                        List<String> sources,
+                        boolean unified) {
             this.prefix = prefix;
             this.resolver = resolver;
             this.repository = repository;
             this.sources = sources;
+            this.unified = unified;
         }
 
         @Override
@@ -984,7 +1009,8 @@ public class MavenProject implements BuildExecutorModule {
                         selfPom,
                         false,
                         qualifiedDependencies,
-                        attachments(value, false));
+                        attachments(value, false),
+                        siblings);
                 writeModule(maven.resolve(tests + ".properties"),
                         null,
                         value,
@@ -993,7 +1019,8 @@ public class MavenProject implements BuildExecutorModule {
                         selfPom,
                         true,
                         qualifiedDependencies,
-                        attachments(value, true));
+                        attachments(value, true),
+                        siblings);
                 modules.setProperty(main, main + ".properties");
                 modules.setProperty(tests, tests + ".properties");
             }
@@ -1139,7 +1166,8 @@ public class MavenProject implements BuildExecutorModule {
                                  MavenDependencyKey selfPom,
                                  boolean test,
                                  String qualifiedDependencies,
-                                 String attachments) throws IOException {
+                                 String attachments,
+                                 Map<String, String> siblings) throws IOException {
             SequencedProperties properties = new SequencedProperties();
             properties.setProperty("coordinate", test
                     ? new MavenDependencyKey(value.groupId(), value.artifactId(), "jar", "tests")
@@ -1183,6 +1211,26 @@ public class MavenProject implements BuildExecutorModule {
                 }
             }
             if (!test && value.dependencies() != null) {
+                String scopes = value.dependencies().entrySet().stream()
+                        .filter(dep -> dep.getValue().scope() != MavenDependencyScope.SYSTEM
+                                && dep.getValue().scope() != MavenDependencyScope.IMPORT
+                                && !Objects.equals(siblings.get(dep.getKey().groupId() + "/" + dep.getKey().artifactId()),
+                                        dep.getValue().version()))
+                        .map(dep -> dep.getKey().coordinate(prefix, dep.getValue().version()) + "=" + switch (dep.getValue().scope()) {
+                            case COMPILE -> "compile runtime";
+                            case PROVIDED -> "compile";
+                            case RUNTIME -> "runtime";
+                            case TEST, SYSTEM, IMPORT -> "";
+                        })
+                        .collect(Collectors.joining("\t"));
+                if (!scopes.isEmpty()) {
+                    properties.setProperty("scopes", scopes);
+                }
+                if (unified) {
+                    properties.setProperty("unified", "true");
+                }
+            }
+            if (!test && value.dependencies() != null) {
                 String optional = value.dependencies().entrySet().stream()
                         .filter(dep -> dep.getValue().scope() != MavenDependencyScope.TEST
                                 && Boolean.TRUE.equals(dep.getValue().optional()))
@@ -1203,22 +1251,6 @@ public class MavenProject implements BuildExecutorModule {
                     }
                 });
             }
-            value.expressions().forEach((depKey, expression) -> {
-                MavenDependencyValue resolved = value.managedDependencies() == null
-                        ? null
-                        : value.managedDependencies().get(depKey);
-                if (resolved == null && value.dependencies() != null) {
-                    resolved = value.dependencies().get(depKey);
-                }
-                MavenDependencyKey raw = expression.key();
-                properties.setProperty("expression." + depKey.coordinate(null, null),
-                        raw.groupId() + "/" + raw.artifactId()
-                                + "/" + (raw.type() == null ? "" : raw.type())
-                                + "/" + (raw.classifier() == null ? "" : raw.classifier())
-                                + (expression.version() == null || resolved == null || resolved.version() == null
-                                        ? ""
-                                        : " " + expression.version() + " " + resolved.version()));
-            });
             if (value.managedDependencies() != null) {
                 value.managedDependencies().forEach((depKey, depValue) -> {
                     if (depValue.exclusions() != null && !depValue.exclusions().isEmpty()) {
@@ -1227,10 +1259,6 @@ public class MavenProject implements BuildExecutorModule {
                                 depValue.exclusions().stream()
                                         .map(name -> name.groupId() + "/" + name.artifactId())
                                         .collect(Collectors.joining(",")));
-                    }
-                    if (depValue.scope() != null && depValue.scope() != MavenDependencyScope.IMPORT) {
-                        properties.setProperty("managed.scope." + depKey.coordinate(prefix, null),
-                                depValue.scope().name().toLowerCase(Locale.ROOT));
                     }
                 });
             }
@@ -1292,7 +1320,7 @@ public class MavenProject implements BuildExecutorModule {
             if (!test && value.dependencies() != null) {
                 Map<Boolean, Set<String>> tokens = value.dependencies().entrySet().stream()
                         .collect(Collectors.partitioningBy(dep -> dep.getValue().scope() == MavenDependencyScope.TEST,
-                                Collectors.mapping(dep -> dep.getKey().coordinate(null, null), Collectors.toSet())));
+                                Collectors.mapping(dep -> dep.getKey().coordinate("maven", null), Collectors.toSet())));
                 aliases.values().removeIf(token -> tokens.get(true).contains(token) && !tokens.get(false).contains(token));
             }
             if (!aliases.isEmpty()) {

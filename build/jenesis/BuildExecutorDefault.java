@@ -13,7 +13,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     private final Path target;
     private final Duration timeout;
-    private final HashDigestFunction hash;
+    private final String algorithm;
+    private final HashFunction hash;
     private final BuildStepHashFunction stepHash;
     private final BuildExecutorCallback callback;
     private final BuildExecutorCache cache;
@@ -27,7 +28,8 @@ class BuildExecutorDefault implements BuildExecutor {
 
     BuildExecutorDefault(Path target,
                          Duration timeout,
-                         HashDigestFunction hash,
+                         String algorithm,
+                         HashFunction hash,
                          BuildStepHashFunction stepHash,
                          BuildExecutorCallback callback,
                          BuildExecutorCache cache,
@@ -38,6 +40,7 @@ class BuildExecutorDefault implements BuildExecutor {
                          Map<String, StepSummary> inherited) throws IOException {
         this.target = Files.isDirectory(target) ? target : Files.createDirectory(target);
         this.timeout = timeout;
+        this.algorithm = algorithm;
         this.hash = hash;
         this.stepHash = stepHash;
         this.callback = callback;
@@ -140,8 +143,8 @@ class BuildExecutorDefault implements BuildExecutor {
                     arguments.put(entry.getKey(), new BuildStepArgument(
                             entry.getValue().folder(),
                             consistent && checksums != null && Files.exists(checksums)
-                                    ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, hash)
-                                    : Checksum.added(argumentChecksums, hash)));
+                                    ? Checksum.diff(HashFunction.read(checksums), argumentChecksums, algorithm)
+                                    : Checksum.added(argumentChecksums, algorithm)));
                 }
                 SequencedMap<String, Set<Path>> vanished = consistent
                         ? previous.vanished(recorded, summaries.keySet())
@@ -153,8 +156,18 @@ class BuildExecutorDefault implements BuildExecutor {
                         location + identity,
                         new LinkedHashSet<>(summaries.keySet()));
                 boolean cacheRemotely = step.shouldCacheRemotely();
-                Path next = target.resolve(identity + BuildExecutor.NEXT);
+                Path next = target.resolve(identity + BuildExecutor.NEXT),
+                        salvaged = target.resolve(identity + BuildExecutor.NEXT + PERSISTENT);
+                if (Files.exists(salvaged)) {
+                    Files.walkFileTree(salvaged, new RecursiveFolderDeletion(null));
+                }
                 if (Files.exists(next)) {
+                    Path marker = next.resolve(BuildExecutor.FAILED_MARKER), failed = next.resolve(PERSISTENT);
+                    if (Files.isDirectory(failed)
+                            && Files.isRegularFile(marker)
+                            && Files.readString(marker).equals(HexFormat.of().formatHex(currentStepHash))) {
+                        Files.move(failed, salvaged);
+                    }
                     Files.walkFileTree(next, new RecursiveFolderDeletion(null));
                 }
                 if (!consistent || step.shouldRun(arguments)) {
@@ -173,10 +186,15 @@ class BuildExecutorDefault implements BuildExecutor {
                         callback.loaded(location + identity, System.nanoTime() - fetchStarted);
                     }
                     Path nextPersistent = next.resolve(PERSISTENT);
-                    if (!fromCache && consistent && Files.isDirectory(previous.persistent())) {
+                    if (!fromCache && Files.isDirectory(salvaged)) {
+                        Files.move(salvaged, nextPersistent);
+                    } else if (!fromCache && consistent && Files.isDirectory(previous.persistent())) {
                         Files.move(previous.persistent(), nextPersistent);
                     } else {
                         Files.createDirectory(nextPersistent);
+                    }
+                    if (Files.exists(salvaged)) {
+                        Files.walkFileTree(salvaged, new RecursiveFolderDeletion(null));
                     }
                     CompletionStage<BuildStepResult> stepStage;
                     if (fromCache) {
@@ -256,7 +274,7 @@ class BuildExecutorDefault implements BuildExecutor {
                                                     inputs,
                                                     cacheRemotely,
                                                     previous.output(),
-                                                    hash.algorithm(),
+                                                    algorithm,
                                                     checksums);
                                         } catch (IOException _) {
                                         }
@@ -280,7 +298,8 @@ class BuildExecutorDefault implements BuildExecutor {
                         };
                         try {
                             if (Files.isDirectory(next)) {
-                                Files.createFile(next.resolve(BuildExecutor.FAILED_MARKER));
+                                Files.writeString(next.resolve(BuildExecutor.FAILED_MARKER),
+                                        HexFormat.of().formatHex(currentStepHash));
                             }
                         } catch (IOException e) {
                             wrapped.addSuppressed(e);
@@ -289,6 +308,9 @@ class BuildExecutorDefault implements BuildExecutor {
                         return CompletableFuture.failedStage(wrapped);
                     }, executor);
                 } else {
+                    if (Files.exists(salvaged)) {
+                        Files.walkFileTree(salvaged, new RecursiveFolderDeletion(null));
+                    }
                     if (!vanished.isEmpty()) {
                         previous.forget(recorded, vanished.keySet());
                     }
@@ -361,6 +383,7 @@ class BuildExecutorDefault implements BuildExecutor {
                     }
                     BuildExecutorDefault buildExecutor = new BuildExecutorDefault(target.resolve(prefix),
                             timeout,
+                            algorithm,
                             hash,
                             stepHash,
                             callback,
@@ -462,9 +485,9 @@ class BuildExecutorDefault implements BuildExecutor {
     }
 
     @Override
-    public CompletionStage<SequencedMap<String, Path>> execute(Executor executor, String... selectors) {
-        Set<Selector> initial = Arrays.stream(selectors)
-                .map(s -> new Selector(s, false))
+    public CompletionStage<SequencedMap<String, Path>> execute(Executor executor, List<String> selectors, List<String> optional) {
+        Set<Selector> initial = Stream.concat(selectors.stream().map(selector -> new Selector(selector, false)),
+                        optional.stream().map(selector -> new Selector(selector, true)))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Path canonical = target.toAbsolutePath().normalize();
         FileChannel lock = lock(canonical);
