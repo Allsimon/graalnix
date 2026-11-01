@@ -38,9 +38,12 @@ Dependency versions and checksums live in one bill of materials,
 java build/jenesis/Make.java pin
 ----
 
-`jenesis.properties` points `pin` at that file; the tools that the modules use
-stay pinned in their declarations, and those of the project plugins in
-`jenesis.plugins.pin.properties`.
+`jenesis.properties` points `pin` at that file and names the groups it holds:
+the dependencies, and the tools the modules run (palantir-java-format, JaCoCo),
+which the modules import it into as `@jenesis.bom palantir:tool/pin-graalnix.properties`.
+A plugin's own version stays pinned in each declaration, as
+`palantir/module/...`: Jenesis does not read it from a file. The project
+plugins' tools are pinned in `jenesis.plugins.pin.properties`.
 
 == Nix
 
