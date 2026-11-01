@@ -1,4 +1,4 @@
-package org.graalnix.launcher;
+package org.graalnix.cli;
 
 import java.io.IOException;
 import java.io.PrintWriter;

@@ -15,6 +15,12 @@ java -Djenesis.make.profiles=native build/jenesis/Make.java stage
                                                             # native launcher in target/stage/native/output
 ----
 
+The command line comes in two modules. `cli` holds `format`, `check` and `fix`
+and its own `graalnix` command with only these. `launcher` adds `eval` and
+`drv-path`, which need the evaluator and so Truffle. `jenesis.properties` makes
+`Execute.java` run the launcher; `-Djenesis.execute.module=cli/src/main/java`
+runs the other. The native profile of `cli` is `native-lite`.
+
 == Documentation
 
 This documentation is written in AsciiDoc in `docs/`. Files whose names start
@@ -58,6 +64,9 @@ The flake provides:
 names them. Without GraalVM's compiler, Truffle runs its fallback runtime,
 which only interprets; runtime compilation is off by default anyway.
 `graalnix-native`:: the launcher as a static native image, built with GraalVM.
+`graalnix-lite`:: the `cli` module on OpenJDK 25: `format`, `check` and `fix`
+only, without Truffle.
+`graalnix-lite-native`:: the `cli` module as a static native image.
 `docs`:: this documentation, rendered to HTML.
 `tests`:: a check that runs the test suite on the JVM and outputs its JaCoCo
 report.

@@ -19,9 +19,7 @@
  */
 module org.graalnix.launcher {
     requires info.picocli;
-    requires org.graalnix.format;
-    requires org.graalnix.lint;
-    requires org.graalnix.parser;
+    requires org.graalnix.cli;
     requires org.graalvm.polyglot;
     // Required only to be on the module path, where the polyglot engine finds them as services.
     requires org.graalnix;

@@ -16,12 +16,19 @@
       packages = forAllSystems (pkgs: rec {
         graalnix = pkgs.callPackage ./nix/package.nix { };
         graalnix-native = graalnix.native;
+        graalnix-lite = graalnix.lite;
+        graalnix-lite-native = graalnix.lite-native;
         inherit (graalnix) docs;
         default = graalnix;
       });
 
       checks = forAllSystems (pkgs: {
-        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) graalnix graalnix-native;
+        inherit (self.packages.${pkgs.stdenv.hostPlatform.system})
+          graalnix
+          graalnix-native
+          graalnix-lite
+          graalnix-lite-native
+          ;
         inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests docs;
         lint-builders = pkgs.callPackage ./nix/lint-builders.nix { };
       });

@@ -1,10 +1,10 @@
-package org.graalnix.launcher;
+package org.graalnix.cli;
 
 import org.graalnix.lint.Linter;
 import picocli.CommandLine.Command;
 
 @Command(name = "fix", description = "Apply the linter's fixes to Nix files in place, then format them.")
-final class Fix extends Rewrite {
+public final class Fix extends Rewrite {
     @Override
     String rewrite(String src) {
         return style.format(Linter.fix(src));

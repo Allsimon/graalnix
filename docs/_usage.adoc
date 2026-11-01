@@ -9,6 +9,10 @@ nix build .#graalnix          # on OpenJDK 25
 nix build .#graalnix-native   # native image, built with GraalVM
 ----
 
+To format and lint only, `graalnix-lite` and `graalnix-lite-native` provide a
+`graalnix` command with only `format`, `check` and `fix`, without the evaluator
+and Truffle.
+
 Evaluate an expression:
 
 [source,console]

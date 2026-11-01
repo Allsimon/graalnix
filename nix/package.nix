@@ -20,9 +20,8 @@ let
           ../build/jenesis
           ../build.jenesis
           ../jenesis.properties
+          ../cli/src/main
           ../format/src/main
-          ../language/src/main
-          ../launcher/src/main
           ../lint/src/main
           ../parser/src/main
           ../store/src/main
@@ -30,6 +29,10 @@ let
         ++ paths
       );
     };
+  evaluator = [
+    ../language/src/main
+    ../launcher/src/main
+  ];
   testPaths = [
     ../language/src/test
     ../launcher/src/test
@@ -42,8 +45,8 @@ let
     ../docs
     ../jenesis.plugins.pin.properties
   ];
-  src = sources [ ];
-  testSrc = sources testPaths;
+  src = sources evaluator;
+  testSrc = sources (evaluator ++ testPaths);
 
   deps = import ./pins.nix { inherit lib fetchurl linkFarm; } ../.;
 
@@ -79,7 +82,7 @@ let
 
   docs = stdenv.mkDerivation {
     name = "graalnix-docs";
-    src = sources docPaths;
+    src = sources (evaluator ++ docPaths);
     nativeBuildInputs = [ jdk ];
     buildPhase = ''
       runHook preBuild
@@ -95,75 +98,118 @@ let
     '';
   };
 
-  native = stdenv.mkDerivation {
-    pname = "graalnix-native";
-    version = "0.1.0";
+  # Builds only the package step of a module, and so only the modules it requires.
+  package =
+    module: profile:
+    lib.optionalString (profile != null) "-Djenesis.make.profiles=${profile} "
+    + "build/jenesis/Make.java build/modules/compose/module/package-module-${module}+src+main+java";
+  output = module: "target/build/modules/compose/module/package-module-${module}+src+main+java";
+
+  jvm =
+    {
+      pname,
+      module,
+      src,
+      meta,
+    }:
+    stdenv.mkDerivation {
+      inherit pname src meta;
+      version = "0.1.0";
+
+      nativeBuildInputs = [
+        jdk
+        makeWrapper
+        unzip
+      ];
+
+      buildPhase = ''
+        runHook preBuild
+        ${offline}
+        java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+          -Djenesis.documentation.asciidoctor=false ${package module null}
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+        mkdir -p $out/share/graalnix
+        unzip -q ${output module}/bundle/output/bundle/bundle.zip jars/'*' application.unix.args -d $out/share/graalnix
+        sed -i -E "s#([\":])jars/#\1$out/share/graalnix/jars/#g" $out/share/graalnix/application.unix.args
+        makeWrapper ${jdk}/bin/java $out/bin/graalnix --add-flags @$out/share/graalnix/application.unix.args
+        runHook postInstall
+      '';
+    };
+
+  native =
+    {
+      pname,
+      module,
+      profile,
+      src,
+      meta,
+    }:
+    stdenv.mkDerivation {
+      inherit pname src;
+      version = "0.1.0";
+
+      nativeBuildInputs = [ graalvmPackages.graalvm-ce-musl ];
+
+      buildPhase = ''
+        runHook preBuild
+        ${offline}
+        java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+          -Djenesis.documentation.asciidoctor=false ${package module profile}
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+        install -Dm755 ${output module}/native-image/output/native/org.graalnix.${module} $out/bin/graalnix
+        runHook postInstall
+      '';
+
+      meta = meta // {
+        description = meta.description + ", as a native image";
+      };
+    };
+
+  full = {
+    pname = "graalnix";
+    module = "launcher";
     inherit src;
-
-    nativeBuildInputs = [ graalvmPackages.graalvm-ce-musl ];
-
-    buildPhase = ''
-      runHook preBuild
-      ${offline}
-      java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
-        -Djenesis.documentation.asciidoctor=false -Djenesis.make.profiles=native build/jenesis/Make.java stage
-      runHook postBuild
-    '';
-
-    installPhase = ''
-      runHook preInstall
-      install -Dm755 target/stage/native/output/org.graalnix.launcher $out/bin/graalnix
-      runHook postInstall
-    '';
-
-    meta = meta // {
-      description = "Nix language implementation on GraalVM/Truffle, as a native image";
+    meta = {
+      description = "Nix language implementation on GraalVM/Truffle";
+      mainProgram = "graalnix";
+      platforms = lib.platforms.linux;
     };
   };
 
-  meta = {
-    description = "Nix language implementation on GraalVM/Truffle";
-    mainProgram = "graalnix";
-    platforms = lib.platforms.linux;
+  lite = {
+    pname = "graalnix-lite";
+    module = "cli";
+    src = sources [ ];
+    meta = full.meta // {
+      description = "Nix formatter and linter of graalnix, without the evaluator";
+    };
   };
 in
-stdenv.mkDerivation {
-  pname = "graalnix";
-  version = "0.1.0";
-  inherit src;
-
-  nativeBuildInputs = [
-    jdk
-    makeWrapper
-    unzip
-  ];
-
-  buildPhase = ''
-    runHook preBuild
-    ${offline}
-    java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
-      -Djenesis.documentation.asciidoctor=false build/jenesis/Make.java
-    runHook postBuild
-  '';
-
-  installPhase = ''
-    runHook preInstall
-    mkdir -p $out/share/graalnix
-    unzip -q target/build/modules/compose/module/package-module-launcher+src+main+java/bundle/output/bundle/bundle.zip \
-      jars/'*' application.unix.args -d $out/share/graalnix
-    sed -i -E "s#([\":])jars/#\1$out/share/graalnix/jars/#g" $out/share/graalnix/application.unix.args
-    makeWrapper ${jdk}/bin/java $out/bin/graalnix --add-flags @$out/share/graalnix/application.unix.args
-    runHook postInstall
-  '';
-
+(jvm full).overrideAttrs {
   passthru = {
-    inherit
-      deps
-      tests
-      docs
-      native
-      ;
+    inherit deps tests docs;
+    native = native (
+      full
+      // {
+        pname = "graalnix-native";
+        profile = "native";
+      }
+    );
+    lite = jvm lite;
+    lite-native = native (
+      lite
+      // {
+        pname = "graalnix-lite-native";
+        profile = "native-lite";
+      }
+    );
   };
-
-  inherit meta;
 }

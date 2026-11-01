@@ -1,4 +1,4 @@
-package org.graalnix.launcher;
+package org.graalnix.cli;
 
 import org.graalnix.format.Formatter;
 import picocli.CommandLine.Option;

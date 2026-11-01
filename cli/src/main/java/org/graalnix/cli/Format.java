@@ -1,9 +1,9 @@
-package org.graalnix.launcher;
+package org.graalnix.cli;
 
 import picocli.CommandLine.Command;
 
 @Command(name = "format", description = "Format Nix files in place, as nixfmt does.")
-final class Format extends Rewrite {
+public final class Format extends Rewrite {
     @Override
     String rewrite(String src) {
         return style.format(src);
