@@ -226,6 +226,7 @@ class CommandLineTest {
         assertThat(run("nope")).isEqualTo(2);
         assertThat(run("eval")).isEqualTo(2);
         assertThat(run("eval", "-E", "1", "a.nix")).isEqualTo(2);
+        assertThat(run("eval", "-E", "1", "--arg", "x")).isEqualTo(2);
         assertThat(run("eval", "--no-such-option", "-E", "1")).isEqualTo(2);
         assertThat(run("format", "--width", "wide")).isEqualTo(2);
     }

@@ -8,18 +8,35 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 import java.util.concurrent.Callable;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import picocli.CommandLine.ArgGroup;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.IParameterConsumer;
+import picocli.CommandLine.Model.ArgSpec;
 import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Model.OptionSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
 import picocli.CommandLine.Unmatched;
 
+@Command(
+        exitCodeListHeading = "%nExit status%n",
+        exitCodeList = {"0:The evaluation succeeded.", "1:The evaluation failed.", "2:The command line is invalid."},
+        footerHeading = "%nEngine options%n",
+        footer = {
+            "Any other --name or --name=value option goes to the GraalVM polyglot engine, as name=true or name=value."
+                    + " This includes the language's own --nix.* options and the Truffle tools, such as --inspect"
+                    + " for the Chrome DevTools debugger and --cpusampler to profile the evaluation.",
+            "",
+            "Runtime compilation is off by default: on nixpkgs it made evaluations 4 to 10%% slower for 1.5 times"
+                    + " the CPU and memory. --engine.Compilation=true turns it back on."
+        })
 abstract class Evaluate implements Callable<Integer> {
     @Spec
     CommandSpec spec;
@@ -31,8 +48,23 @@ abstract class Evaluate implements Callable<Integer> {
                 description = "Evaluate EXPR.")
         String expr;
 
-        @Parameters(paramLabel = "FILE", description = "Evaluate FILE; a directory stands for its default.nix.")
+        @Parameters(paramLabel = "FILE", description = "Evaluate FILE, or the default.nix of a directory.")
         Path file;
+    }
+
+    /** Takes the two values of {@code --arg NAME EXPR}; arity 2 would print the label twice in the help. */
+    static final class Pair implements IParameterConsumer {
+        @Override
+        public void consumeParameters(Stack<String> args, ArgSpec argSpec, CommandSpec commandSpec) {
+            if (args.size() < 2) {
+                throw new ParameterException(
+                        commandSpec.commandLine(),
+                        "Missing " + argSpec.paramLabel() + " after " + ((OptionSpec) argSpec).longestName());
+            }
+            List<String> values = argSpec.getValue();
+            values.add(args.pop());
+            values.add(args.pop());
+        }
     }
 
     @ArgGroup(multiplicity = "1")
@@ -46,21 +78,24 @@ abstract class Evaluate implements Callable<Integer> {
 
     @Option(
             names = "--arg",
-            arity = "2",
-            hideParamSyntax = true,
             paramLabel = "NAME EXPR",
+            parameterConsumer = Pair.class,
             description = "Call a function result with NAME bound to EXPR.")
     List<String> args = new ArrayList<>();
 
     @Option(
             names = "--argstr",
-            arity = "2",
-            hideParamSyntax = true,
             paramLabel = "NAME VALUE",
+            parameterConsumer = Pair.class,
             description = "Call a function result with NAME bound to the string VALUE.")
     List<String> argstrs = new ArrayList<>();
 
-    @Option(names = "-I", paramLabel = "PATH", description = "Add to the search path, before NIX_PATH.")
+    @Option(
+            names = {"-I", "--include"},
+            paramLabel = "PATH",
+            description =
+                    "Add an entry to the search path of lookups such as <nixpkgs>, as nixpkgs=/path/to/nixpkgs; the"
+                            + " entries of NIX_PATH come after.")
     List<String> searchPath = new ArrayList<>();
 
     @Option(names = "--system", paramLabel = "SYS", description = "Set builtins.currentSystem.")
