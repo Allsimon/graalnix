@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Stack;
 import java.util.concurrent.Callable;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import picocli.CommandLine.ArgGroup;
@@ -120,11 +121,21 @@ abstract class Evaluate implements Callable<Integer> {
         }
     }
 
+    /** Truffle's fallback runtime, on a JDK whose compiler it cannot use, rejects the compilation options. */
+    private static boolean compiles() {
+        try (Engine engine = Engine.newBuilder()
+                .option("engine.WarnInterpreterOnly", "false")
+                .build()) {
+            return engine.getOptions().get("engine.Compilation") != null;
+        }
+    }
+
     @Override
     public Integer call() {
-        Context.Builder builder = Context.newBuilder("nix").allowAllAccess(true);
+        Context.Builder builder =
+                Context.newBuilder("nix").allowAllAccess(true).option("engine.WarnInterpreterOnly", "false");
         // Measured on nixpkgs: runtime compilation made evaluations 4-10% slower at 1.5x the CPU and memory.
-        builder.option("engine.Compilation", "false");
+        if (compiles()) builder.option("engine.Compilation", "false");
         if (system != null) builder.option("nix.System", system);
         for (String a : engineOptions) {
             if (!a.startsWith("--")) throw new ParameterException(spec.commandLine(), "Unexpected argument: " + a);

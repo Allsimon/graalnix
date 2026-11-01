@@ -51,5 +51,13 @@ plugins' tools are pinned in `jenesis.plugins.pin.properties`.
 declarations and of both pin files, and fetches each pinned jar and POM, so a
 new pin needs nothing more.
 
-The flake provides `graalnix` (the native binary), `docs`, and a `tests` check
-that runs the test suite on the JVM and outputs its JaCoCo report.
+The flake provides:
+
+`graalnix`:: the launcher on OpenJDK 25. It runs the bundle the launcher's
+`packaging.properties` asks for: its jars and the `java` argument file that
+names them. Without GraalVM's compiler, Truffle runs its fallback runtime,
+which only interprets; runtime compilation is off by default anyway.
+`graalnix-native`:: the launcher as a static native image, built with GraalVM.
+`docs`:: this documentation, rendered to HTML.
+`tests`:: a check that runs the test suite on the JVM and outputs its JaCoCo
+report.

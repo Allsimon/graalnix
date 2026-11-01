@@ -1,12 +1,15 @@
 {
   lib,
   stdenv,
+  jdk25_headless,
   graalvmPackages,
   fetchurl,
   linkFarm,
+  makeWrapper,
+  unzip,
 }:
 let
-  jdk = graalvmPackages.graalvm-ce-musl;
+  jdk = jdk25_headless;
 
   sources =
     paths:
@@ -91,25 +94,65 @@ let
       runHook postInstall
     '';
   };
+
+  native = stdenv.mkDerivation {
+    pname = "graalnix-native";
+    version = "0.1.0";
+    inherit src;
+
+    nativeBuildInputs = [ graalvmPackages.graalvm-ce-musl ];
+
+    buildPhase = ''
+      runHook preBuild
+      ${offline}
+      java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+        -Djenesis.documentation.asciidoctor=false -Djenesis.make.profiles=native build/jenesis/Make.java stage
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+      install -Dm755 target/stage/native/output/org.graalnix.launcher $out/bin/graalnix
+      runHook postInstall
+    '';
+
+    meta = meta // {
+      description = "Nix language implementation on GraalVM/Truffle, as a native image";
+    };
+  };
+
+  meta = {
+    description = "Nix language implementation on GraalVM/Truffle";
+    mainProgram = "graalnix";
+    platforms = lib.platforms.linux;
+  };
 in
 stdenv.mkDerivation {
   pname = "graalnix";
   version = "0.1.0";
   inherit src;
 
-  nativeBuildInputs = [ jdk ];
+  nativeBuildInputs = [
+    jdk
+    makeWrapper
+    unzip
+  ];
 
   buildPhase = ''
     runHook preBuild
     ${offline}
     java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
-      -Djenesis.documentation.asciidoctor=false -Djenesis.make.profiles=native build/jenesis/Make.java stage
+      -Djenesis.documentation.asciidoctor=false build/jenesis/Make.java
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    install -Dm755 target/stage/native/output/org.graalnix.launcher $out/bin/graalnix
+    mkdir -p $out/share/graalnix
+    unzip -q target/build/modules/compose/module/package-module-launcher+src+main+java/bundle/output/bundle/bundle.zip \
+      jars/'*' application.unix.args -d $out/share/graalnix
+    sed -i -E "s#([\":])jars/#\1$out/share/graalnix/jars/#g" $out/share/graalnix/application.unix.args
+    makeWrapper ${jdk}/bin/java $out/bin/graalnix --add-flags @$out/share/graalnix/application.unix.args
     runHook postInstall
   '';
 
@@ -118,12 +161,9 @@ stdenv.mkDerivation {
       deps
       tests
       docs
+      native
       ;
   };
 
-  meta = {
-    description = "Nix language implementation on GraalVM/Truffle";
-    mainProgram = "graalnix";
-    platforms = lib.platforms.linux;
-  };
+  inherit meta;
 }
