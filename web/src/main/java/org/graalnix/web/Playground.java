@@ -1,0 +1,94 @@
+package org.graalnix.web;
+
+import java.util.Locale;
+import java.util.function.Supplier;
+import org.graalnix.format.Formatter;
+import org.graalnix.lint.Diagnostic;
+import org.graalnix.lint.Linter;
+import org.graalnix.parser.ParseException;
+import org.teavm.jso.JSExport;
+
+/**
+ * The formatter and linter for JavaScript. Each method returns JSON, its result or
+ * {@code {"error": {"start": ..., "message": ...}}}; offsets count UTF-16 code units, as JavaScript strings do.
+ */
+public final class Playground {
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
+    private Playground() {}
+
+    /** {@code {"output": ...}}. */
+    @JSExport
+    public static String format(String src, int width, int indent, boolean strict) {
+        return guard(src, () -> output(Formatter.format(src, width, indent, strict)));
+    }
+
+    /** {@code {"output": ...}}: the linter's fixes, then the formatting. */
+    @JSExport
+    public static String fix(String src, int width, int indent, boolean strict) {
+        return guard(src, () -> output(Formatter.format(Linter.fix(src), width, indent, strict)));
+    }
+
+    /** {@code {"diagnostics": [{"start", "end", "severity", "rule", "message", "fixable"}, ...]}}. */
+    @JSExport
+    public static String lint(String src) {
+        return guard(src, () -> {
+            StringBuilder sb = new StringBuilder("{\"diagnostics\":[");
+            for (Diagnostic d : Linter.lint(src)) {
+                if (sb.charAt(sb.length() - 1) == '}') sb.append(',');
+                sb.append("{\"start\":")
+                        .append(d.start())
+                        .append(",\"end\":")
+                        .append(d.end())
+                        .append(",\"severity\":")
+                        .append(quote(d.severity().name().toLowerCase(Locale.ROOT)))
+                        .append(",\"rule\":")
+                        .append(quote(d.rule().id()))
+                        .append(",\"message\":")
+                        .append(quote(d.message()))
+                        .append(",\"fixable\":")
+                        .append(!d.fix().isEmpty())
+                        .append('}');
+            }
+            return sb.append("]}").toString();
+        });
+    }
+
+    /** Input nested deeper than the JavaScript stack allows fails with a RangeError, wrapped in no specific type. */
+    private static String guard(String src, Supplier<String> result) {
+        try {
+            return result.get();
+        } catch (ParseException e) {
+            return error(Math.min(e.offset, src.length()), e.getMessage());
+        } catch (RuntimeException | Error e) {
+            return error(0, String.valueOf(e.getMessage()));
+        }
+    }
+
+    private static String output(String s) {
+        return "{\"output\":" + quote(s) + "}";
+    }
+
+    private static String error(int start, String message) {
+        return "{\"error\":{\"start\":" + start + ",\"message\":" + quote(message) + "}}";
+    }
+
+    private static String quote(String s) {
+        StringBuilder sb = new StringBuilder(s.length() + 2).append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"' -> sb.append("\\\"");
+                case '\\' -> sb.append("\\\\");
+                case '\n' -> sb.append("\\n");
+                case '\r' -> sb.append("\\r");
+                case '\t' -> sb.append("\\t");
+                default -> {
+                    if (c < 0x20) sb.append("\\u00").append(HEX[c >> 4]).append(HEX[c & 0xf]);
+                    else sb.append(c);
+                }
+            }
+        }
+        return sb.append('"').toString();
+    }
+}

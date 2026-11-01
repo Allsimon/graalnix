@@ -18,7 +18,7 @@
         graalnix-native = graalnix.native;
         graalnix-lite = graalnix.lite;
         graalnix-lite-native = graalnix.lite-native;
-        inherit (graalnix) docs;
+        inherit (graalnix) docs playground;
         default = graalnix;
       });
 
@@ -29,7 +29,8 @@
           graalnix-lite
           graalnix-lite-native
           ;
-        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests docs;
+        inherit (self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix) tests docs playground;
+        playground-tests = self.packages.${pkgs.stdenv.hostPlatform.system}.graalnix.playgroundTests;
         lint-builders = pkgs.callPackage ./nix/lint-builders.nix { };
       });
 
