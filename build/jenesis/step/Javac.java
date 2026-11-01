@@ -90,6 +90,7 @@ public class Javac extends ProcessBuildStep {
                 ? ProcessHandler.OfProcess.ofJavaHome("bin/javac").apply(commands)
                         .daemon(terms.daemon())
                         .scoped(terms.shared())
+                        .directory(terms.directory())
                 : super.handler(context, commands);
     }
 
@@ -258,6 +259,9 @@ public class Javac extends ProcessBuildStep {
                 processorPath = new ArrayList<>(),
                 siblingClasses = new ArrayList<>(),
                 options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
+        if (undebugged(prepended(properties))) {
+            options.add("-g");
+        }
         if (headers) {
             options.addAll(List.of("-h", Files.createDirectory(context.next().resolve(HEADERS)).toString()));
         }
@@ -404,6 +408,10 @@ public class Javac extends ProcessBuildStep {
                 }
             }
         }
+    }
+
+    private static boolean undebugged(List<String> options) {
+        return options.stream().noneMatch(option -> option.equals("-g") || option.startsWith("-g:"));
     }
 
     private static boolean names(SequencedMap<String, SequencedMap<String, String>> properties, Set<String> options) {
@@ -667,6 +675,9 @@ public class Javac extends ProcessBuildStep {
                         .resolve(SOURCES + "META-INF/versions/" + release));
         List<String> commands = new ArrayList<>(prepended),
                 options = new ArrayList<>(List.of("-d", target.toString(), "-s", generated.toString()));
+        if (undebugged(prepended)) {
+            options.add("-g");
+        }
         commands.addAll(sourceAndTarget
                 ? List.of("--source", Integer.toString(release), "--target", Integer.toString(release))
                 : List.of("--release", Integer.toString(release)));

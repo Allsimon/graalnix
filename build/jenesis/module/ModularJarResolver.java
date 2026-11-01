@@ -4,6 +4,7 @@ import module java.base;
 import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.License;
+import build.jenesis.Environment.Setting;
 import build.jenesis.ModuleGraph;
 import build.jenesis.PathPlacement;
 import build.jenesis.Repository;
@@ -34,7 +35,7 @@ public class ModularJarResolver implements Resolver {
     public static ModularJarResolver ofEnvironment(Environment environment,
                                                    boolean resolveAutomaticModules,
                                                    Resolver fallback) {
-        String property = environment.getProperty("resolver.module");
+        String property = environment.getProperty("resolver.module", Setting.PROJECT);
         if (property == null) {
             return new ModularJarResolver(resolveAutomaticModules, fallback);
         }
@@ -62,9 +63,12 @@ public class ModularJarResolver implements Resolver {
     public Resolver.Resolution dependencies(Executor executor,
                                             String prefix,
                                             Map<String, Repository> repositories,
-                                            SequencedMap<String, SequencedSet<String>> coordinates,
+                                            SequencedMap<String, SequencedSet<String>> asked,
                                             SequencedMap<String, String> versions,
+                                            SequencedMap<String, SequencedSet<String>> managedExclusions,
+                                            Map<String, Set<DependencyScope>> scopes,
                                             DependencyScope scope) throws IOException {
+        SequencedMap<String, SequencedSet<String>> coordinates = Resolver.placed(asked, scopes, scope);
         coordinates.forEach((coordinate, exclusions) -> {
             if (!exclusions.isEmpty()) {
                 throw new IllegalArgumentException("Cannot exclude "
@@ -279,12 +283,12 @@ public class ModularJarResolver implements Resolver {
                 unresolvedCoordinates.put(coordinate, Collections.emptyNavigableSet());
             }
             Resolver.Resolution fallbackResolution = fallback.dependencies(
-                    executor, prefix, repositories, unresolvedCoordinates, hints, scope);
+                    executor, prefix, repositories, unresolvedCoordinates, hints, Collections.emptyNavigableMap(), Map.of(), scope);
             fallbackResolution.artifacts().forEach(dependencies::putIfAbsent);
             edges.addAll(fallbackResolution.edges());
             fallbackResolution.vertices().forEach(nodes::putIfAbsent);
         }
-        return new Resolver.Resolution(dependencies, edges, nodes);
+        return new Resolver.Resolution(dependencies, edges, nodes, Collections.emptyNavigableMap());
     }
 
     private static String aliased(String module,

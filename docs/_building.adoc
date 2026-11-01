@@ -35,12 +35,12 @@ Dependency versions and checksums live in one bill of materials,
 
 [source,sh]
 ----
-java -Djenesis.pin.file=build.jenesis/pin-graalnix.properties build/jenesis/Make.java pin
 java build/jenesis/Make.java pin
 ----
 
-The second command pins the tools that the modules and the project plugins use
-(`jenesis.plugins.pin.properties`).
+`jenesis.properties` points `pin` at that file; the tools that the modules use
+stay pinned in their declarations, and those of the project plugins in
+`jenesis.plugins.pin.properties`.
 
 == Nix
 

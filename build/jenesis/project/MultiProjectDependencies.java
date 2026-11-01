@@ -28,9 +28,11 @@ public class MultiProjectDependencies implements BuildStep {
                 Path.of(BOMS),
                 Path.of(SIGNATURES),
                 Path.of(EXCLUSIONS),
+                Path.of(SCOPES),
                 Path.of(OVERRIDES),
                 Path.of(IDENTITY),
                 Path.of(Abi.ABI),
+                Path.of(Abi.TESTED),
                 Path.of(Abi.ABIS),
                 Path.of(Assign.VARIANTS),
                 Path.of(Assign.INACTIVE),
@@ -46,7 +48,7 @@ public class MultiProjectDependencies implements BuildStep {
         SequencedMap<String, String> dependencies = new LinkedHashMap<>(), variants = new TreeMap<>(), inactive = new TreeMap<>();
         String path = null, tested = null;
         SequencedMap<String, SequencedMap<String, String>> inherited = new LinkedHashMap<>();
-        for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, OVERRIDES)) {
+        for (String name : List.of(VERSIONS, ALIASES, BOMS, SIGNATURES, EXCLUSIONS, SCOPES, OVERRIDES)) {
             inherited.put(name, new LinkedHashMap<>());
         }
         for (Map.Entry<String, BuildStepArgument> entry : arguments.entrySet()) {
@@ -108,7 +110,6 @@ public class MultiProjectDependencies implements BuildStep {
             }
         }
         SequencedProperties properties = new SequencedProperties();
-        Set<Path> required = new HashSet<>();
         SequencedMap<String, String> versions = inherited.get(VERSIONS);
         for (Map.Entry<String, String> entry : dependencies.entrySet()) {
             String key = entry.getKey();
@@ -147,9 +148,6 @@ public class MultiProjectDependencies implements BuildStep {
                     candidate != null
                             ? fingerprint(arguments.values(), candidate)
                             : entry.getValue());
-            if (candidate != null) {
-                required.add(candidate);
-            }
         }
         Set<Path> tests = new HashSet<>();
         if (tested != null) {
@@ -162,13 +160,14 @@ public class MultiProjectDependencies implements BuildStep {
             }
         }
         for (Map.Entry<String, Path> abi : abis.entrySet()) {
-            Path jar = coordinates.get(abi.getKey());
-            if (jar != null && required.contains(jar) && !tests.contains(jar)) {
+            Path jar = coordinates.get(abi.getKey()),
+                    source = tests.contains(jar) ? abi.getValue().resolveSibling(Abi.TESTED) : abi.getValue();
+            if (jar != null && Files.isRegularFile(source)) {
                 Path target = context.next()
                         .resolve(Abi.FOLDER)
                         .resolve(BuildExecutorModule.encode(abi.getKey()) + ".properties");
                 Files.createDirectories(target.getParent());
-                Files.copy(abi.getValue(), target);
+                Files.copy(source, target);
             }
         }
         if (!variants.isEmpty()) {

@@ -2,6 +2,7 @@ package build.jenesis.step;
 
 import module java.base;
 import build.jenesis.Environment;
+import build.jenesis.Environment.Setting;
 import build.jenesis.SequencedProperties;
 import build.jenesis.daemon.Worker;
 
@@ -63,7 +64,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public static Factory ofEnvironment(Environment environment) {
-            String factory = environment.getProperty("process.factory");
+            String factory = environment.getProperty("process.factory", Setting.PROJECT);
             if (factory == null) {
                 if (System.getProperty("org.graalvm.nativeimage.imagecode") == null) {
                     return TOOL;
@@ -199,21 +200,39 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA", "APPDATA", "LOCALAPPDATA");
         private static final Map<String, Path> DRIVERS = new ConcurrentHashMap<>();
         private static final Set<Path> TEMPORARY = ConcurrentHashMap.newKeySet();
+        private static final Set<Process> RUNNING = ConcurrentHashMap.newKeySet();
+        private static final Duration ENDING = Duration.ofSeconds(10);
 
         static {
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> TEMPORARY.forEach(folder -> {
-                try (Stream<Path> files = Files.walk(folder)) {
-                    files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
-                } catch (IOException | UncheckedIOException _) {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                List<ProcessHandle> ending = new ArrayList<>();
+                RUNNING.forEach(process -> {
+                    ending.add(process.toHandle());
+                    process.descendants().forEach(ending::add);
+                });
+                ending.forEach(ProcessHandle::destroy);
+                long deadline = System.nanoTime() + ENDING.toNanos();
+                for (ProcessHandle process : ending) {
+                    try {
+                        process.onExit().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+                    } catch (ExecutionException | InterruptedException | TimeoutException _) {
+                        process.destroyForcibly();
+                    }
                 }
-            })));
+                TEMPORARY.forEach(folder -> {
+                    try (Stream<Path> files = Files.walk(folder)) {
+                        files.sorted(Comparator.reverseOrder()).forEach(file -> file.toFile().delete());
+                    } catch (IOException | UncheckedIOException _) {
+                    }
+                });
+            }));
         }
 
         private final List<String> commands;
         private final SortedMap<String, String> environment;
         private final Charset output, error;
         private final boolean main, daemon, scoped, shared;
-        private final Path aot;
+        private final Path aot, directory;
 
         private OfProcess(List<String> commands) {
             this(commands, encoding(), encoding());
@@ -226,7 +245,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                     environment.put(name, value);
                 }
             });
-            this(commands, environment, output, error, false, false, false, false, null);
+            this(commands, environment, output, error, false, false, false, false, null, null);
         }
 
         private OfProcess(List<String> commands,
@@ -237,9 +256,10 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                           boolean daemon,
                           boolean scoped,
                           boolean shared,
-                          Path aot) {
+                          Path aot,
+                          Path directory) {
             this.commands = commands;
-            this.environment = Collections.unmodifiableSortedMap(environment);
+            this.environment = environment;
             this.output = output;
             this.error = error;
             this.main = main;
@@ -247,6 +267,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
             this.scoped = scoped;
             this.shared = shared;
             this.aot = aot;
+            this.directory = directory;
         }
 
         public static Function<List<String>, OfProcess> ofJavaHome(String command) {
@@ -285,6 +306,7 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                         true,
                         false,
                         false,
+                        null,
                         null);
             };
         }
@@ -437,7 +459,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess environment(SortedMap<String, String> environment) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public boolean daemon() {
@@ -445,7 +476,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess daemon(boolean daemon) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public boolean scoped() {
@@ -453,7 +493,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess scoped(boolean scoped) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public boolean shared() {
@@ -461,7 +510,16 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess shared(boolean shared) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         public Path aot() {
@@ -469,7 +527,33 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         }
 
         public OfProcess aot(Path aot) {
-            return new OfProcess(commands, new TreeMap<>(environment), output, error, main, daemon, scoped, shared, aot);
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
+        }
+
+        public Path directory() {
+            return directory;
+        }
+
+        public OfProcess directory(Path directory) {
+            return new OfProcess(commands,
+                    new TreeMap<>(environment),
+                    output,
+                    error,
+                    main,
+                    daemon,
+                    scoped,
+                    shared,
+                    aot,
+                    directory);
         }
 
         @Override
@@ -481,18 +565,21 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
         public int execute(Path output, Path error, Tee tee) throws IOException {
             JavaWorker.Call call = main || daemon || scoped ? JavaWorker.call(commands) : null;
             if (call != null && (daemon || scoped && (shared || call.main().equals(Worker.TOOL)))) {
-                return JavaWorker.execute(call, shared, daemon, environment, output, error, tee);
+                return JavaWorker.execute(call, shared, daemon, environment, directory, output, error, tee);
             }
             JavaWorker.Once once = call == null || !main || call.main().endsWith(".java")
                     ? null
                     : JavaWorker.once(call, aot);
             ProcessBuilder builder = new ProcessBuilder(once == null ? commands : once.commands());
+            if (directory != null) {
+                builder.directory(directory.toFile());
+            }
             builder.environment().clear();
             builder.environment().putAll(environment);
             builder.environment().putIfAbsent("COLUMNS", "80");
             builder.environment().putIfAbsent("LINES", "24");
             builder.environment().putIfAbsent("TERM", "dumb");
-            Process process = builder.start();
+            Process process = start(builder);
             process.getOutputStream().close();
             CompletableFuture<Void> errored, printed;
             if (tee == null) {
@@ -524,6 +611,23 @@ public sealed interface ProcessHandler permits ProcessHandler.OfTool, ProcessHan
                 Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             }
+        }
+
+        public static int inheriting(List<String> command) throws IOException, InterruptedException {
+            Process process = start(new ProcessBuilder(command).inheritIO());
+            try {
+                return process.waitFor();
+            } catch (InterruptedException e) {
+                process.destroy();
+                throw e;
+            }
+        }
+
+        static Process start(ProcessBuilder builder) throws IOException {
+            Process process = builder.start();
+            RUNNING.add(process);
+            process.onExit().thenRun(() -> RUNNING.remove(process));
+            return process;
         }
 
         private static CompletableFuture<Void> drain(Executor executor,

@@ -11,6 +11,7 @@ import build.jenesis.BuildStepContext;
 import build.jenesis.BuildStepResult;
 import build.jenesis.Checksum;
 import build.jenesis.ChecksumStatus;
+import build.jenesis.DependencyScope;
 import build.jenesis.Environment;
 import build.jenesis.Language;
 import build.jenesis.LanguageFactory;
@@ -284,7 +285,7 @@ class JenesisClassLoaderBridge {
             Field field = foreignChecksumStatus.getField(status.name());
             values.put(status.name(), foreignChecksumOf.invoke(null, field.get(null)));
         }
-        foreignChecksums = Map.copyOf(values);
+        foreignChecksums = values;
         this.origin = origin;
     }
 
@@ -479,12 +480,28 @@ class JenesisClassLoaderBridge {
                     }
                     if (type.isRecord() && bridged(type, source, target)) {
                         Class<?> counterpart = Class.forName(type.getName(), false, target);
-                        RecordComponent[] components = type.getRecordComponents();
-                        Object[] values = new Object[components.length];
-                        Class<?>[] types = new Class<?>[components.length];
-                        for (int index = 0; index < components.length; index++) {
-                            values[index] = convert(components[index].getAccessor().invoke(value), source, target);
-                            types[index] = counterpart(components[index].getType(), target);
+                        Map<String, RecordComponent> components = new HashMap<>();
+                        for (RecordComponent component : type.getRecordComponents()) {
+                            components.put(component.getName(), component);
+                        }
+                        RecordComponent[] fields = counterpart.getRecordComponents();
+                        Object[] values = new Object[fields.length];
+                        Class<?>[] types = new Class<?>[fields.length];
+                        for (int index = 0; index < fields.length; index++) {
+                            RecordComponent component = components.get(fields[index].getName());
+                            types[index] = fields[index].getType();
+                            if (component != null) {
+                                values[index] = convert(component.getAccessor().invoke(value), source, target);
+                            } else if (types[index].isPrimitive()) {
+                                values[index] = Array.get(Array.newInstance(types[index], 1), 0);
+                            } else if (types[index] == Optional.class) {
+                                values[index] = Optional.empty();
+                            } else {
+                                values[index] = Stream.of(Collections.emptyNavigableMap(), List.of(), Collections.emptyNavigableSet())
+                                        .filter(types[index]::isInstance)
+                                        .findFirst()
+                                        .orElse(null);
+                            }
                         }
                         yield counterpart.getDeclaredConstructor(types).newInstance(values);
                     }
@@ -535,12 +552,6 @@ class JenesisClassLoaderBridge {
         }
     }
 
-    private static Class<?> counterpart(Class<?> type, ClassLoader target) throws ClassNotFoundException {
-        return type.isPrimitive() || !type.getName().startsWith("build.jenesis.")
-                ? type
-                : Class.forName(type.getName(), false, target);
-    }
-
     private static final class Adapter implements InvocationHandler, Serializable {
 
         private final Object delegate;
@@ -564,11 +575,44 @@ class JenesisClassLoaderBridge {
             Class<?>[] types = new Class<?>[method.getParameterCount()];
             Object[] converted = new Object[types.length];
             for (int index = 0; index < types.length; index++) {
-                types[index] = counterpart(method.getParameterTypes()[index], origin);
+                Class<?> type = method.getParameterTypes()[index];
+                types[index] = type.isPrimitive() || !type.getName().startsWith("build.jenesis.")
+                        ? type
+                        : Class.forName(type.getName(), false, origin);
                 converted[index] = convert(args[index], loader, origin);
             }
-            Method target = Class.forName(method.getDeclaringClass().getName(), false, origin)
-                    .getMethod(method.getName(), types);
+            Class<?> declaring = Class.forName(method.getDeclaringClass().getName(), false, origin);
+            Method target;
+            if (declaring == Resolver.class && method.getName().equals("dependencies") && types.length < 8) {
+                target = Resolver.class.getMethod("dependencies",
+                        Executor.class,
+                        String.class,
+                        Map.class,
+                        SequencedMap.class,
+                        SequencedMap.class,
+                        SequencedMap.class,
+                        Map.class,
+                        DependencyScope.class);
+                converted = new Object[]{
+                        converted[0],
+                        converted[1],
+                        converted[2],
+                        converted[3],
+                        converted[4],
+                        types.length == 7 ? converted[5] : Collections.emptyNavigableMap(),
+                        Map.of(),
+                        converted[types.length - 1]
+                };
+            } else {
+                try {
+                    target = declaring.getMethod(method.getName(), types);
+                } catch (NoSuchMethodException e) {
+                    if (method.isDefault()) {
+                        return InvocationHandler.invokeDefault(proxy, method, args);
+                    }
+                    throw e;
+                }
+            }
             try {
                 return convert(target.invoke(delegate, converted), origin, loader);
             } catch (InvocationTargetException e) {

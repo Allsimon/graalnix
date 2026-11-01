@@ -1,6 +1,7 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.maven.MavenDefaultRepository;
 import build.jenesis.maven.MavenDefaultVersionNegotiator;
@@ -10,6 +11,7 @@ import build.jenesis.maven.MavenRepository;
 import build.jenesis.module.JenesisRepository;
 import build.jenesis.module.ModularJarResolver;
 import build.jenesis.step.ProcessBuildStep;
+import build.jenesis.step.ProcessHandler;
 
 public record Jpx(Path storage,
                   Map<String, Repository> repositories,
@@ -31,7 +33,8 @@ public record Jpx(Path storage,
 
     private Jpx(Environment environment, PathPlacement placement) {
         boolean modular = placement == PathPlacement.MODULE_PATH;
-        Discovery discovery = environment.flag("repository.discovery") ? Discovery.ofEnvironment(environment) : null;
+        Discovery discovery = environment.flag("repository.discovery",
+                Setting.PROJECT) ? Discovery.ofEnvironment(environment) : null;
         Repository module = JenesisRepository.ofEnvironment(environment, modular
                                                                   ? JenesisRepository.Scope.MODULE
                                                                   : JenesisRepository.Scope.ARTIFACT, discovery);
@@ -126,7 +129,7 @@ public record Jpx(Path storage,
                 List<String> command = new ArrayList<>();
                 command.add(home.resolve("bin").resolve(File.separatorChar == '\\' ? "java.exe" : "java").toString());
                 command.addAll(javaArguments(mainClass, arguments, argumentFile));
-                return new ProcessBuilder(command).inheritIO().start().waitFor();
+                return ProcessHandler.OfProcess.inheriting(command);
             } finally {
                 Files.deleteIfExists(argumentFile);
             }
@@ -432,6 +435,8 @@ public record Jpx(Path storage,
                         repositories,
                         new LinkedHashMap<>(Map.of(command.name(), Collections.emptyNavigableSet())),
                         versions,
+                        Collections.emptyNavigableMap(),
+                        Map.of(),
                         DependencyScope.RUNTIME);
                 root = null;
                 for (String coordinate : resolution.artifacts().sequencedKeySet()) {
@@ -469,6 +474,8 @@ public record Jpx(Path storage,
                         repositories,
                         new LinkedHashMap<>(Map.of(groupId + "/" + artifactId, Collections.emptyNavigableSet())),
                         new LinkedHashMap<>(Map.of(groupId + "/" + artifactId, version)),
+                        Collections.emptyNavigableMap(),
+                        Map.of(),
                         DependencyScope.RUNTIME);
                 root = "maven/" + groupId + "/" + artifactId + "/" + version;
                 if (!resolution.artifacts().containsKey(root)) {

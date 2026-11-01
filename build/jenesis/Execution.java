@@ -1,10 +1,12 @@
 package build.jenesis;
 
 import module java.base;
+import build.jenesis.Environment.Setting;
 import build.jenesis.docker.DockerizedJava;
 import build.jenesis.step.Inventory;
 import build.jenesis.step.Layers;
 import build.jenesis.step.ProcessBuildStep;
+import build.jenesis.step.ProcessHandler;
 
 public record Execution(Project project, String mainClass, String module, Container container) {
 
@@ -14,20 +16,20 @@ public record Execution(Project project, String mainClass, String module, Contai
 
     public static Execution ofEnvironment(Environment environment, Project project) {
         return new Execution(project,
-                environment.getProperty("execute.main"),
-                environment.getProperty("execute.module"),
+                environment.getProperty("execute.main", Setting.PROJECT),
+                environment.getProperty("execute.module", Setting.PROJECT),
                 Container.ofEnvironment(environment));
     }
 
     public record Container(String image, String readable, String writable, String env, boolean announcing) {
 
         public static Container ofEnvironment(Environment environment) {
-            return environment.flag("execute.docker")
-                    ? new Container(environment.getProperty("execute.image"),
-                                    environment.getProperty("execute.readable"),
-                                    environment.getProperty("execute.writable"),
-                                    environment.getProperty("execute.env"),
-                                    environment.flag("print.docker", true))
+            return environment.flag("execute.docker", Setting.MACHINE)
+                    ? new Container(environment.getProperty("execute.image", Setting.MACHINE),
+                                    environment.getProperty("execute.readable", Setting.MACHINE),
+                                    environment.getProperty("execute.writable", Setting.MACHINE),
+                                    environment.getProperty("execute.env", Setting.MACHINE),
+                                    environment.flag("print.docker", true, Setting.PROJECT))
                     : null;
         }
     }
@@ -286,7 +288,7 @@ public record Execution(Project project, String mainClass, String module, Contai
         List<String> command = new ArrayList<>();
         command.add(javaExecutable.toString());
         command.addAll(javaArgs);
-        return new ProcessBuilder(command).inheritIO().start().waitFor();
+        return ProcessHandler.OfProcess.inheriting(command);
     }
 
     public static int run(Environment environment,

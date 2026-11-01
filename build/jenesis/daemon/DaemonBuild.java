@@ -3,6 +3,7 @@ package build.jenesis.daemon;
 import module java.base;
 import build.jenesis.Environment;
 import build.jenesis.Make;
+import build.jenesis.Environment.Setting;
 import build.jenesis.Project;
 import build.jenesis.SequencedProperties;
 
@@ -31,12 +32,12 @@ public final class DaemonBuild {
         }
         String[] selectors = Arrays.copyOfRange(arguments, Math.min(index + 1, arguments.length), arguments.length);
         requested.put("jenesis.make.root", root.toString());
-        requested.put("jenesis.make.mode", "compiled");
+        requested.put("jenesis.make.mode", "daemon");
         requested.putIfAbsent("jenesis.process.mode", "daemon");
         requested.putIfAbsent("jenesis.project.target", root.resolve("target").toString());
         requested.putIfAbsent("jenesis.project.artifacts", root.resolve(".jenesis").resolve("artifacts").toString());
         Map<String, String> keys = Make.keys(requested);
-        if (new Environment(keys).flag("project.docker")) {
+        if (new Environment(keys).flag("project.docker", Setting.MACHINE)) {
             throw new IllegalStateException("A dockerized build cannot run in the daemon, because it replaces the"
                     + " running process - unset jenesis.project.docker or run build/jenesis/Make.java");
         }

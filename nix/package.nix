@@ -14,6 +14,7 @@ let
         [
           ../build/jenesis
           ../build.jenesis
+          ../jenesis.properties
           ../format/src/main
           ../language/src/main
           ../launcher/src/main
@@ -48,33 +49,21 @@ let
       runHook preBuild
       export HOME=$TMPDIR MAVEN_REPOSITORY_LOCAL=$out/maven JENESIS_REPOSITORY_LOCAL=$out/modules
       mkdir -p $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL
-      java -Djenesis.dependency.pin=strict -Djenesis.test.skip=true build/jenesis/Make.java
-      cp -r .jenesis/artifacts $out/artifacts
-      # Jenesis caches nothing it downloads from its module repository, so lay those jars out as a local module folder.
-      grep -rh '^[^#]*/module/[^/=]*/[^/=]*=' target/build --include=dependencies.properties | sort -u |
-        while IFS='=' read -r key value; do
-          coordinate=''${key##*/module/}
-          name=''${coordinate%/*}
-          version=''${coordinate#*/}
-          jar=$(find target/build -path "*/output/''${value%% *}" -print -quit)
-          install -Dm644 "$jar" "$JENESIS_REPOSITORY_LOCAL/$name/$version/$name.jar"
-        done
+      java -Djenesis.make.mode=source -Djenesis.dependency.pin=strict -Djenesis.test.skip=true build/jenesis/Make.java
       runHook postBuild
     '';
     dontInstall = true;
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-cgjCN+7qpvFyf3l9tyzn/4Qg5IHwgoUj/Wb2znSeZ7g=";
+    outputHash = "sha256-FPEyn5/ZJJZMFENBkvFcOtcsWmMMK674dhYSH4FASN8=";
   };
 
   offline = ''
     export HOME=$TMPDIR MAVEN_REPOSITORY_LOCAL=$TMPDIR/maven JENESIS_REPOSITORY_LOCAL=$TMPDIR/modules
     cp -r ${deps}/maven $MAVEN_REPOSITORY_LOCAL
     cp -r ${deps}/modules $JENESIS_REPOSITORY_LOCAL
-    mkdir .jenesis
-    cp -r ${deps}/artifacts .jenesis/artifacts
-    chmod -R u+w $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL .jenesis
+    chmod -R u+w $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL
   '';
 
   tests = stdenv.mkDerivation {
@@ -84,7 +73,7 @@ let
     buildPhase = ''
       runHook preBuild
       ${offline}
-      java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.documentation.asciidoctor=false \
+      java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.documentation.asciidoctor=false \
         build/jenesis/Make.java
       runHook postBuild
     '';
@@ -107,7 +96,7 @@ let
     buildPhase = ''
       runHook preBuild
       ${offline}
-      java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+      java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
         build/jenesis/Make.java stage
       runHook postBuild
     '';
@@ -128,7 +117,7 @@ stdenv.mkDerivation {
   buildPhase = ''
     runHook preBuild
     ${offline}
-    java -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+    java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
       -Djenesis.documentation.asciidoctor=false -Djenesis.make.profiles=native build/jenesis/Make.java stage
     runHook postBuild
   '';

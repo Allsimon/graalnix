@@ -12,12 +12,14 @@ public interface Resolver extends Serializable {
                boolean internal,
                boolean verifiable,
                String version,
-               SequencedMap<String, String> entries) implements Serializable {
+               SequencedMap<String, String> entries,
+               SequencedMap<String, Resolved> poms) implements Serializable {
     }
 
     record Resolution(SequencedMap<String, Resolved> artifacts,
                       List<Edge> edges,
-                      SequencedMap<String, Vertex> vertices) {
+                      SequencedMap<String, Vertex> vertices,
+                      SequencedMap<String, Resolved> poms) {
     }
 
     record Edge(String parent, String coordinate, String version, String scope, boolean followed) {
@@ -31,17 +33,9 @@ public interface Resolver extends Serializable {
                             Map<String, Repository> repositories,
                             SequencedMap<String, SequencedSet<String>> coordinates,
                             SequencedMap<String, String> versions,
+                            SequencedMap<String, SequencedSet<String>> managedExclusions,
+                            Map<String, Set<DependencyScope>> scopes,
                             DependencyScope scope) throws IOException;
-
-    default Resolution dependencies(Executor executor,
-                                    String prefix,
-                                    Map<String, Repository> repositories,
-                                    SequencedMap<String, SequencedSet<String>> coordinates,
-                                    SequencedMap<String, String> versions,
-                                    SequencedMap<String, SequencedSet<String>> managedExclusions,
-                                    DependencyScope scope) throws IOException {
-        return dependencies(executor, prefix, repositories, coordinates, versions, scope);
-    }
 
     default SequencedSet<String> managedPrefixes() {
         return Collections.emptyNavigableSet();
@@ -63,7 +57,8 @@ public interface Resolver extends Serializable {
                 resolved.internal(),
                 true,
                 version,
-                bomEntries(SequencedProperties.ofFiles(resolved.file())));
+                bomEntries(SequencedProperties.ofFiles(resolved.file())),
+                Collections.emptyNavigableMap());
     }
 
     static SequencedMap<String, String> bomEntries(SequencedProperties properties) {
@@ -98,9 +93,42 @@ public interface Resolver extends Serializable {
                 }
                 expanded = key;
             }
-            entries.put(expanded, value);
+            entries.put(pinKey(expanded, value), value);
         }
         return entries;
+    }
+
+    static boolean pom(String coordinate) {
+        String[] segments = coordinate.split("/");
+        return segments.length == 4 && segments[2].equals("pom");
+    }
+
+    static SequencedMap<String, SequencedSet<String>> placed(SequencedMap<String, SequencedSet<String>> coordinates,
+                                                             Map<String, Set<DependencyScope>> scopes,
+                                                             DependencyScope scope) {
+        SequencedMap<String, SequencedSet<String>> placed = new LinkedHashMap<>(coordinates);
+        placed.keySet().removeIf(coordinate -> !scopes.getOrDefault(coordinate, Set.of(scope)).contains(scope));
+        return placed;
+    }
+
+    static String pinKey(String key, String value) {
+        int space = value.indexOf(' ');
+        String[] segments = key.split("/");
+        return space > 0
+                && segments.length > 3
+                && segments[segments.length - 1].equals("pom")
+                && segments[segments.length - 4].equals("maven")
+                ? key + "/" + value.substring(0, space)
+                : key;
+    }
+
+    static String pinToken(String key) {
+        String[] segments = key.split("/");
+        return segments.length > 4
+                && segments[segments.length - 2].equals("pom")
+                && segments[segments.length - 5].equals("maven")
+                ? key.substring(0, key.lastIndexOf('/'))
+                : key;
     }
 
     static String base(String prefix) {
@@ -130,20 +158,7 @@ public interface Resolver extends Serializable {
             throw new IllegalStateException("Malformed checksum '" + checksum
                     + "' for " + coordinate + ", expected <algorithm>/<hex>");
         }
-        MessageDigest digest;
-        try {
-            digest = MessageDigest.getInstance(checksum.substring(0, slash));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
-        try (InputStream inputStream = Files.newInputStream(file)) {
-            byte[] buffer = new byte[8192];
-            int read;
-            while ((read = inputStream.read(buffer)) != -1) {
-                digest.update(buffer, 0, read);
-            }
-        }
-        byte[] actual = digest.digest();
+        byte[] actual = HashFunction.ofFileKeys(new HashDigestFunction(checksum.substring(0, slash))).hash(file);
         if (!Arrays.equals(actual, HexFormat.of().parseHex(checksum.substring(slash + 1)))) {
             throw new IllegalStateException("Mismatched digest for " + coordinate + ": " + file + " is "
                     + checksum.substring(0, slash) + "/" + HexFormat.of().formatHex(actual) + " where the pin names "
@@ -185,9 +200,9 @@ public interface Resolver extends Serializable {
     }
 
     static Resolver identity() {
-        return (executor, prefix, repositories, coordinates, _, _) -> {
+        return (executor, prefix, repositories, coordinates, _, _, scopes, scope) -> {
             SequencedMap<String, String> resolved = new LinkedHashMap<>();
-            coordinates.sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
+            placed(coordinates, scopes, scope).sequencedKeySet().forEach(coordinate -> resolved.put(prefix + "/" + coordinate, ""));
             SequencedMap<String, Resolved> artifacts = materializeAll(executor, repositories, prefix, resolved);
             List<Edge> edges = new ArrayList<>();
             SequencedMap<String, Vertex> vertices = new LinkedHashMap<>();
@@ -195,7 +210,7 @@ public interface Resolver extends Serializable {
                 edges.add(new Edge(null, coordinate, null, null, true));
                 vertices.put(coordinate, new Vertex(null, null, false, artifacts.get(coordinate).internal(), List.of()));
             });
-            return new Resolution(artifacts, edges, vertices);
+            return new Resolution(artifacts, edges, vertices, Collections.emptyNavigableMap());
         };
     }
 }

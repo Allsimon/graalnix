@@ -18,13 +18,6 @@ public class MavenPomEmitter {
     public IOConsumer emit(String groupId,
                            String artifactId,
                            String version,
-                           SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies) {
-        return emit(groupId, artifactId, version, dependencies, null);
-    }
-
-    public IOConsumer emit(String groupId,
-                           String artifactId,
-                           String version,
                            SequencedMap<MavenDependencyKey, MavenDependencyValue> dependencies,
                            Metadata metadata) {
         return emit(groupId, artifactId, version, null, dependencies, Collections.emptyNavigableMap(), metadata);
@@ -287,8 +280,8 @@ public class MavenPomEmitter {
         static final Metadata NONE = new Metadata(null, null, null, List.of(), List.of(), null, null);
 
         public Metadata {
-            licenses = licenses == null ? List.of() : List.copyOf(licenses);
-            developers = developers == null ? List.of() : List.copyOf(developers);
+            licenses = licenses == null ? List.of() : licenses;
+            developers = developers == null ? List.of() : developers;
         }
 
         public Metadata(String name,
@@ -510,7 +503,7 @@ public class MavenPomEmitter {
                                 String timezone) implements Serializable {
 
             public Developer {
-                roles = roles == null ? List.of() : List.copyOf(roles);
+                roles = roles == null ? List.of() : roles;
             }
 
             public Developer(String id, String name, String email) {
