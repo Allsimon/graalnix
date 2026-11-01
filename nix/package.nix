@@ -101,6 +101,35 @@ let
     '';
   };
 
+  # The formatter as a Maven repository, for the IntelliJ plugin (Allsimon/devenv-intellij) to build against.
+  mavenRepo = stdenv.mkDerivation {
+    name = "graalnix-maven-repo";
+    src = lib.fileset.toSource {
+      root = ../.;
+      fileset = lib.fileset.unions [
+        ../build/jenesis
+        ../build.jenesis
+        ../jenesis.properties
+        ../format/src/main
+        ../parser/src/main
+      ];
+    };
+    nativeBuildInputs = [ jdk ];
+    buildPhase = ''
+      runHook preBuild
+      ${offline}
+      java -Djenesis.make.mode=source -Djenesis.repository.offline=true -Djenesis.dependency.pin=strict -Djenesis.test.skip=true \
+        -Djenesis.documentation.asciidoctor=false build/jenesis/Make.java stage/maven
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+      mkdir -p $out/org/graalnix
+      cp -r target/stage/maven/output/org/graalnix/org.graalnix.{parser,format} $out/org/graalnix
+      runHook postInstall
+    '';
+  };
+
   # Builds only the package step of a module, and so only the modules it requires.
   package =
     module: profile:
@@ -255,6 +284,7 @@ in
       deps
       tests
       docs
+      mavenRepo
       playground
       playgroundTests
       ;

@@ -3,7 +3,7 @@
  *
  * <p>It ports nixfmt 1.5.0 (https://github.com/NixOS/nixfmt, MPL-2.0) on top of graalnix's parser.
  *
- * @jenesis.release 25
+ * @jenesis.release 21
  * @jenesis.bom pin-graalnix.properties
  * @jenesis.bom palantir:tool/pin-graalnix.properties
  * @jenesis.pin palantir/module/build.jenesis 0.18.0 SHA-256/35a94fc0761110ebcd2fa51b2226a3e7e0a942b14cd69d67cc584bf5f3519f70
