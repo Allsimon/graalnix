@@ -6,6 +6,17 @@
 <title>graalnix playground</title>
 <style>
 :root { color-scheme: light dark; --border: #8884; --muted: #888; --error: #d33; --warning: #c80; --hint: #38c; }
+.keyword { color: light-dark(#a626a4, #c678dd); }
+.string { color: light-dark(#50a14f, #98c379); }
+.escape { color: light-dark(#c18401, #e5c07b); }
+.interp { color: light-dark(#e45649, #e06c75); }
+.number, .constant { color: light-dark(#986801, #d19a66); }
+.path { color: light-dark(#0184bc, #56b6c2); }
+.comment { color: light-dark(#a0a1a7, #7f848e); font-style: italic; }
+.builtin { color: light-dark(#ca1243, #be5046); }
+.attr { color: light-dark(#4078f2, #61afef); }
+.param { font-style: italic; }
+.operator { color: light-dark(#696c77, #9da5b4); }
 * { box-sizing: border-box; }
 body { margin: 0; font: 15px/1.4 system-ui, sans-serif; display: grid; grid-template-rows: auto 1fr auto; height: 100vh; }
 header { display: flex; flex-wrap: wrap; align-items: center; gap: .75em 1.25em; padding: .6em 1em; border-bottom: 1px solid var(--border); }
@@ -17,11 +28,14 @@ main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
 section { display: grid; grid-template-rows: auto 1fr; min-height: 0; min-width: 0; }
 section + section { border-left: 1px solid var(--border); }
 h2 { margin: 0; padding: .3em 1em; font-size: .85em; font-weight: normal; color: var(--muted); border-bottom: 1px solid var(--border); }
-textarea { width: 100%; height: 100%; border: 0; padding: 1em; resize: none; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; outline: none; background: transparent; color: inherit; white-space: pre; }
+textarea, #output { width: 100%; height: 100%; border: 0; padding: 1em; resize: none; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; outline: none; background: transparent; color: inherit; white-space: pre; }
+#source { color: transparent; caret-color: CanvasText; }
+#source::selection { color: transparent; background: #38f5; }
+#output { margin: 0; overflow: auto; }
 .editor { position: relative; min-height: 0; }
 .editor textarea, #marks { position: absolute; inset: 0; margin: 0; }
-#marks { padding: 1em calc(1em + 20px) 1em 1em; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; white-space: pre; overflow: hidden; color: transparent; pointer-events: none; }
-mark { background: none; color: transparent; text-decoration: underline wavy; text-decoration-skip-ink: none; text-underline-offset: 3px; }
+#marks { padding: 1em calc(1em + 20px) 1em 1em; font: 14px/1.45 ui-monospace, monospace; tab-size: 2; white-space: pre; overflow: hidden; pointer-events: none; }
+mark { background: none; color: inherit; text-decoration: underline wavy; text-decoration-skip-ink: none; text-underline-offset: 3px; }
 mark.error { text-decoration-color: var(--error); }
 mark.warning { text-decoration-color: var(--warning); }
 mark.hint { text-decoration: underline dotted var(--hint) 2px; }
@@ -103,7 +117,7 @@ stdenv.mkDerivation rec {
   </section>
   <section>
     <h2 id="title">Fixed and formatted</h2>
-    <textarea id="output" spellcheck="false" readonly aria-live="polite"></textarea>
+    <pre id="output" tabindex="0" aria-live="polite"></pre>
   </section>
 </main>
 <ul id="findings" aria-live="polite"></ul>
@@ -154,7 +168,13 @@ function span(className, text) {
 
 const RANK = { hint: 1, warning: 2, error: 3 };
 
-function showMarks(text, diagnostics) {
+let diagnostics = [];
+
+function tokensOf(text) {
+  return JSON.parse(self.highlight(text)).tokens ?? [];
+}
+
+function paint(target, text, tokens, diagnostics) {
   const ranges = diagnostics.map(d => {
     let { start, end } = d;
     if (end <= start) {
@@ -163,25 +183,34 @@ function showMarks(text, diagnostics) {
     }
     return { start, end, severity: d.severity };
   });
-  const cuts = [...new Set([0, text.length, ...ranges.flatMap(r => [r.start, r.end])])]
+  const cuts = [...new Set([0, text.length, ...tokens.flatMap(t => [t[0], t[1]]), ...ranges.flatMap(r => [r.start, r.end])])]
     .filter(i => i <= text.length).sort((a, b) => a - b);
   const parts = [];
+  let t = 0;
   for (let i = 0; i + 1 < cuts.length; i++) {
     const [from, to] = [cuts[i], cuts[i + 1]];
+    while (t < tokens.length && tokens[t][1] <= from) t++;
+    const kind = t < tokens.length && tokens[t][0] <= from ? tokens[t][2] : null;
     const severity = ranges.filter(r => r.start <= from && to <= r.end)
       .reduce((worst, r) => !worst || RANK[r.severity] > RANK[worst] ? r.severity : worst, null);
-    const chunk = text.slice(from, to);
+    let part = text.slice(from, to);
+    if (kind) part = span(kind, part);
     if (severity) {
       const mark = document.createElement("mark");
       mark.className = severity;
-      mark.textContent = chunk;
-      parts.push(mark);
-    } else {
-      parts.push(chunk);
+      mark.append(part);
+      part = mark;
     }
+    parts.push(part);
   }
+  target.replaceChildren(...parts);
+}
+
+function showMarks() {
+  const text = source.value;
+  paint(marks, text, tokensOf(text), diagnostics);
   // Extra lines let the backdrop scroll as far as the textarea, whose horizontal scrollbar takes height.
-  marks.replaceChildren(...parts, "\n\n\n");
+  marks.append("\n\n\n");
   syncScroll();
 }
 
@@ -192,7 +221,8 @@ function syncScroll() {
 
 function showFindings(text) {
   const result = JSON.parse(self.lint(text));
-  showMarks(text, result.diagnostics ?? []);
+  diagnostics = result.diagnostics ?? [];
+  showMarks();
   findings.replaceChildren();
   if (result.error) {
     findings.append(item("error", [result.error.message]));
@@ -215,9 +245,8 @@ function showOutput(text) {
   document.getElementById("title").textContent = name === "fix" ? "Fixed and formatted" : "Formatted";
   const result = JSON.parse(self[name](text, ...options()));
   output.classList.toggle("failed", Boolean(result.error));
-  output.value = result.error
-    ? position(text, result.error.start) + ": " + result.error.message
-    : result.output;
+  if (result.error) output.textContent = position(text, result.error.start) + ": " + result.error.message;
+  else paint(output, result.output, tokensOf(result.output), []);
 }
 
 function refresh() {
@@ -230,6 +259,7 @@ function refresh() {
 
 let pending;
 source.addEventListener("input", () => {
+  showMarks();
   clearTimeout(pending);
   pending = setTimeout(refresh, 150);
 });

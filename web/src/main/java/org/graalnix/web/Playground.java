@@ -54,6 +54,25 @@ public final class Playground {
         });
     }
 
+    /** {@code {"tokens": [[start, end, kind], ...]}}, sorted and disjoint. */
+    @JSExport
+    public static String highlight(String src) {
+        return guard(src, () -> {
+            StringBuilder sb = new StringBuilder("{\"tokens\":[");
+            for (Highlighter.Span s : Highlighter.highlight(src)) {
+                if (sb.charAt(sb.length() - 1) == ']') sb.append(',');
+                sb.append('[')
+                        .append(s.start())
+                        .append(',')
+                        .append(s.end())
+                        .append(',')
+                        .append(quote(s.kind()))
+                        .append(']');
+            }
+            return sb.append("]}").toString();
+        });
+    }
+
     /** Input nested deeper than the JavaScript stack allows fails with a RangeError, wrapped in no specific type. */
     private static String guard(String src, Supplier<String> result) {
         try {
