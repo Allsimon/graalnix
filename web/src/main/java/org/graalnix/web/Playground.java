@@ -5,6 +5,7 @@ import java.util.function.Supplier;
 import org.graalnix.format.Formatter;
 import org.graalnix.lint.Diagnostic;
 import org.graalnix.lint.Linter;
+import org.graalnix.parser.Highlighter;
 import org.graalnix.parser.ParseException;
 import org.teavm.jso.JSExport;
 
@@ -66,7 +67,7 @@ public final class Playground {
                         .append(',')
                         .append(s.end())
                         .append(',')
-                        .append(quote(s.kind()))
+                        .append(quote(s.kind().id()))
                         .append(']');
             }
             return sb.append("]}").toString();

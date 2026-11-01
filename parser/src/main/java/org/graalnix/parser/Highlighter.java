@@ -1,4 +1,4 @@
-package org.graalnix.web;
+package org.graalnix.parser;
 
 import static org.graalnix.parser.TokenType.*;
 
@@ -7,15 +7,31 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
-import org.graalnix.parser.Lexer;
-import org.graalnix.parser.ParseException;
-import org.graalnix.parser.Token;
-import org.graalnix.parser.TokenType;
 
 /** Classifies the source by lexing alone, so that it survives syntax errors; a lexing error ends it. */
-final class Highlighter {
-    record Span(int start, int end, String kind) {}
+public final class Highlighter {
+    public enum Kind {
+        KEYWORD,
+        STRING,
+        ESCAPE,
+        INTERP,
+        COMMENT,
+        CONSTANT,
+        BUILTIN,
+        NUMBER,
+        PATH,
+        OPERATOR,
+        ATTR,
+        PARAM;
+
+        public String id() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    public record Span(int start, int end, Kind kind) {}
 
     private static final Set<TokenType> KEYWORDS = Set.of(IF, THEN, ELSE, ASSERT, WITH, LET, IN, REC, INHERIT, OR_KW);
     private static final Set<String> CONSTANTS = Set.of("true", "false", "null");
@@ -45,14 +61,16 @@ final class Highlighter {
     private final List<Span> spans = new ArrayList<>();
     /** The tokens outside string literals, a string standing as its STR_OPEN, for the classification by neighbours. */
     private final List<Token> tokens = new ArrayList<>();
-    private final List<String> kinds = new ArrayList<>();
+
+    private final List<Kind> kinds = new ArrayList<>();
 
     private Highlighter(String src) {
         this.src = src;
         this.lexer = new Lexer(src);
     }
 
-    static List<Span> highlight(String src) {
+    /** The classified spans of {@code src}, sorted and disjoint; text in none of them is plain. */
+    public static List<Span> highlight(String src) {
         Highlighter h = new Highlighter(src);
         try {
             h.code(false);
@@ -75,11 +93,11 @@ final class Highlighter {
                     return;
                 }
                 case STR_OPEN -> {
-                    add(t, "string");
+                    add(t, Kind.STRING);
                     string(t);
                 }
                 case IND_STR_OPEN -> {
-                    add(t, "string");
+                    add(t, Kind.STRING);
                     indString(t);
                 }
                 case LBRACE -> {
@@ -88,14 +106,14 @@ final class Highlighter {
                 }
                 case DOLLAR_CURLY -> {
                     braces.push(true);
-                    add(t, "interp");
+                    add(t, Kind.INTERP);
                 }
                 case RBRACE -> {
                     if (braces.isEmpty() && interpolation) {
-                        add(t, "interp");
+                        add(t, Kind.INTERP);
                         return;
                     }
-                    add(t, !braces.isEmpty() && braces.pop() ? "interp" : null);
+                    add(t, !braces.isEmpty() && braces.pop() ? Kind.INTERP : null);
                 }
                 case PATH, HPATH -> {
                     add(t, null);
@@ -107,7 +125,7 @@ final class Highlighter {
     }
 
     private void string(Token open) {
-        spans.add(new Span(open.start(), open.end(), "string"));
+        spans.add(new Span(open.start(), open.end(), Kind.STRING));
         while (true) {
             int start = lexer.pos();
             Lexer.Part part = lexer.stringPart();
@@ -116,16 +134,16 @@ final class Highlighter {
                 case LIT -> {
                     for (int i = start; i < end; ) {
                         int next = src.charAt(i) == '\\' ? Math.min(i + 2, end) : i + 1;
-                        spans.add(new Span(i, next, next - i == 2 ? "escape" : "string"));
+                        spans.add(new Span(i, next, next - i == 2 ? Kind.ESCAPE : Kind.STRING));
                         i = next;
                     }
                 }
                 case INTERP -> {
-                    spans.add(new Span(end - 2, end, "interp"));
+                    spans.add(new Span(end - 2, end, Kind.INTERP));
                     code(true);
                 }
                 case END -> {
-                    spans.add(new Span(end - 1, end, "string"));
+                    spans.add(new Span(end - 1, end, Kind.STRING));
                     return;
                 }
             }
@@ -133,19 +151,21 @@ final class Highlighter {
     }
 
     private void indString(Token open) {
-        spans.add(new Span(open.start(), open.end(), "string"));
+        spans.add(new Span(open.start(), open.end(), Kind.STRING));
         while (true) {
             int start = lexer.pos();
             Lexer.Part part = lexer.indStringPart();
             int end = lexer.pos();
             switch (part.kind()) {
-                case LIT -> spans.add(new Span(start, end, part.hasIndentation() || end - start < 3 ? "string" : "escape"));
+                case LIT ->
+                    spans.add(
+                            new Span(start, end, part.hasIndentation() || end - start < 3 ? Kind.STRING : Kind.ESCAPE));
                 case INTERP -> {
-                    spans.add(new Span(end - 2, end, "interp"));
+                    spans.add(new Span(end - 2, end, Kind.INTERP));
                     code(true);
                 }
                 case END -> {
-                    spans.add(new Span(end - 2, end, "string"));
+                    spans.add(new Span(end - 2, end, Kind.STRING));
                     return;
                 }
             }
@@ -159,9 +179,9 @@ final class Highlighter {
             Lexer.Part part = lexer.pathPart();
             int end = lexer.pos();
             switch (part.kind()) {
-                case LIT -> spans.add(new Span(start, end, "path"));
+                case LIT -> spans.add(new Span(start, end, Kind.PATH));
                 case INTERP -> {
-                    spans.add(new Span(end - 2, end, "interp"));
+                    spans.add(new Span(end - 2, end, Kind.INTERP));
                     code(true);
                 }
                 case END -> {
@@ -177,11 +197,11 @@ final class Highlighter {
             if (src.charAt(i) == '#') {
                 int end = i;
                 while (end < to && src.charAt(end) != '\n' && src.charAt(end) != '\r') end++;
-                spans.add(new Span(i, end, "comment"));
+                spans.add(new Span(i, end, Kind.COMMENT));
                 i = end;
             } else if (src.startsWith("/*", i)) {
                 int end = src.indexOf("*/", i + 2) + 2;
-                spans.add(new Span(i, end, "comment"));
+                spans.add(new Span(i, end, Kind.COMMENT));
                 i = end;
             } else {
                 i++;
@@ -189,7 +209,7 @@ final class Highlighter {
         }
     }
 
-    private void add(Token t, String kind) {
+    private void add(Token t, Kind kind) {
         tokens.add(t);
         kinds.add(kind);
     }
@@ -204,9 +224,9 @@ final class Highlighter {
                 case ASSIGN -> attrPath(i);
                 case INHERIT -> inherit(i);
                 case COLON, AT -> {
-                    if (type(i - 1) == ID) kinds.set(i - 1, "param");
+                    if (type(i - 1) == ID) kinds.set(i - 1, Kind.PARAM);
                     if (type(i - 1) == RBRACE) formals(i - 1);
-                    if (type(i) == AT && type(i + 1) == ID) kinds.set(i + 1, "param");
+                    if (type(i) == AT && type(i + 1) == ID) kinds.set(i + 1, Kind.PARAM);
                 }
                 default -> {}
             }
@@ -219,23 +239,23 @@ final class Highlighter {
         }
     }
 
-    private static String kind(Token t, boolean selected) {
+    private static Kind kind(Token t, boolean selected) {
         return switch (t.type()) {
             case ID -> {
                 if (selected) yield null;
-                if (CONSTANTS.contains(t.text())) yield "constant";
-                yield BUILTINS.contains(t.text()) ? "builtin" : null;
+                if (CONSTANTS.contains(t.text())) yield Kind.CONSTANT;
+                yield BUILTINS.contains(t.text()) ? Kind.BUILTIN : null;
             }
-            case INT, FLOAT -> "number";
-            case PATH, HPATH, SPATH, URI -> "path";
-            default -> KEYWORDS.contains(t.type()) ? "keyword" : "operator";
+            case INT, FLOAT -> Kind.NUMBER;
+            case PATH, HPATH, SPATH, URI -> Kind.PATH;
+            default -> KEYWORDS.contains(t.type()) ? Kind.KEYWORD : Kind.OPERATOR;
         };
     }
 
     /** Marks the names of {@code a.b.c =}, ending before {@code assign}. */
     private void attrPath(int assign) {
         for (int i = assign - 1; type(i) == ID || type(i) == STR_OPEN; i -= 2) {
-            if (type(i) == ID) kinds.set(i, "attr");
+            if (type(i) == ID) kinds.set(i, Kind.ATTR);
             if (type(i - 1) != DOT) return;
         }
     }
@@ -249,7 +269,7 @@ final class Highlighter {
             }
             i++;
         }
-        for (; type(i) == ID || type(i) == STR_OPEN; i++) if (type(i) == ID) kinds.set(i, "attr");
+        for (; type(i) == ID || type(i) == STR_OPEN; i++) if (type(i) == ID) kinds.set(i, Kind.ATTR);
     }
 
     /** Marks the names of the formals whose closing brace is {@code close}. */
@@ -260,7 +280,7 @@ final class Highlighter {
             if (t == RBRACE) depth++;
             if (t == LBRACE || t == DOLLAR_CURLY) depth--;
             if (depth == 0) return;
-            if (depth == 1 && t == ID && (type(i - 1) == LBRACE || type(i - 1) == COMMA)) kinds.set(i, "param");
+            if (depth == 1 && t == ID && (type(i - 1) == LBRACE || type(i - 1) == COMMA)) kinds.set(i, Kind.PARAM);
         }
     }
 
@@ -270,7 +290,7 @@ final class Highlighter {
         for (Span s : spans) {
             if (s.start() == s.end()) continue;
             Span last = out.isEmpty() ? null : out.get(out.size() - 1);
-            if (last != null && last.end() == s.start() && last.kind().equals(s.kind()))
+            if (last != null && last.end() == s.start() && last.kind() == s.kind())
                 out.set(out.size() - 1, new Span(last.start(), s.end(), s.kind()));
             else out.add(s);
         }
