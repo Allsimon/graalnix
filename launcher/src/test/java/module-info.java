@@ -26,6 +26,7 @@
 module org.graalnix.launcher.test {
     requires org.graalnix.launcher;
     requires info.picocli;
+    requires info.picocli.codegen;
     requires org.junit.jupiter;
     requires org.assertj.core;
 }

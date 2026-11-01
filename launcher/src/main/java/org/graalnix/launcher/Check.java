@@ -15,8 +15,15 @@ import picocli.CommandLine.Spec;
 
 @Command(
         name = "check",
-        description = "Report the linter's findings in Nix files without changing them;"
-                + " exit with 1 if any is an error or a warning.")
+        description = "Report the linter's findings in Nix files without changing them.",
+        exitCodeListHeading = "%nExit status%n",
+        exitCodeList = {
+            "0:No finding is an error or a warning.",
+            "1:A finding is an error or a warning, or a file cannot be read.",
+            "2:The command line is invalid."
+        },
+        footerHeading = "%nOutput%n",
+        footer = "Each finding is printed on one line as FILE:LINE:COLUMN: SEVERITY[RULE]: MESSAGE.")
 final class Check implements Callable<Integer> {
     @Spec
     CommandSpec spec;

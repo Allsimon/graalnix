@@ -11,7 +11,7 @@ import picocli.CommandLine.ScopeType;
 @Command(
         name = "graalnix",
         description = "A Nix language implementation on GraalVM.",
-        subcommands = {Eval.class, DrvPath.class, Format.class, Check.class, Fix.class})
+        subcommands = {Format.class, Check.class, Fix.class, Eval.class, DrvPath.class})
 public final class Main {
     private static final long STACK_SIZE = 1L << 30;
 

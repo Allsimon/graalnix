@@ -29,6 +29,7 @@ let
     ../launcher/src/test
     ../format/src/test
     ../lint/src/test
+    ../docs/cli
     ../docs/_lint-rules.adoc
   ];
   docPaths = [
@@ -64,7 +65,7 @@ let
     dontFixup = true;
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-q/EtY/ex3S8wJOyjPUXY7IAoKd4mfz8/N0KZguDEalo=";
+    outputHash = "sha256-cgjCN+7qpvFyf3l9tyzn/4Qg5IHwgoUj/Wb2znSeZ7g=";
   };
 
   offline = ''

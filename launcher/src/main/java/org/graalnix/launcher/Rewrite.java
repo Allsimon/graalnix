@@ -9,16 +9,30 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.Callable;
 import org.graalnix.parser.ParseException;
+import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.Spec;
 
-/**
- * Rewrites files in place, as the treefmt formatter spec asks (https://treefmt.com/latest/reference/formatter-spec/):
- * a file is written only when its content changes, and a file that fails makes the exit status nonzero.
- */
+@Command(
+        exitCodeListHeading = "%nExit status%n",
+        exitCodeList = {
+            "0:Every file was processed.",
+            "1:A file cannot be read or does not parse.",
+            "2:The command line is invalid."
+        },
+        footerHeading = "%nFiles%n",
+        footer = {
+            "Files are read as UTF-8, and one that is not is refused. A file is written only when its content"
+                    + " changes. A file that fails is reported on standard error, and the other files are still"
+                    + " processed. Each file rewritten is named on standard error, then a count of the files"
+                    + " changed, unchanged and failed, and the time taken.",
+            "",
+            "This follows the treefmt formatter spec:",
+            "https://treefmt.com/latest/reference/formatter-spec/"
+        })
 abstract class Rewrite implements Callable<Integer> {
     @Spec
     CommandSpec spec;
