@@ -1,4 +1,4 @@
-package org.graalnix.launcher;
+package org.graalnix.cli;
 
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -24,7 +24,7 @@ import picocli.CommandLine.Spec;
         },
         footerHeading = "%nOutput%n",
         footer = "Each finding is printed on one line as FILE:LINE:COLUMN: SEVERITY[RULE]: MESSAGE.")
-final class Check implements Callable<Integer> {
+public final class Check implements Callable<Integer> {
     @Spec
     CommandSpec spec;
 
