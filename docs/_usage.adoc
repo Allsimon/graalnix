@@ -1,10 +1,12 @@
 = Getting started
 
-Build the static native binary (linked against musl) with Nix:
+Build it with Nix, either on the JVM or as a static native binary (linked
+against musl), which starts in milliseconds rather than half a second:
 
 [source,sh]
 ----
-nix build .#graalnix
+nix build .#graalnix          # on OpenJDK 25
+nix build .#graalnix-native   # native image, built with GraalVM
 ----
 
 Evaluate an expression:

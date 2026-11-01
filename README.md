@@ -5,7 +5,8 @@ It evaluates nixpkgs unmodified and computes store paths and `.drv` paths in
 memory, without writing anything to `/nix/store`.
 
 ```sh
-nix build .#graalnix          # static native binary (musl)
+nix build .#graalnix          # on OpenJDK 25
+nix build .#graalnix-native   # static native binary (musl), built with GraalVM
 ./result/bin/graalnix eval --strict -E 'builtins.map (x: x * 2) [ 1 2 3 ]'
 ./result/bin/graalnix drv-path -I nixpkgs=/path/to/nixpkgs -E 'import <nixpkgs> {}' -A hello
 ./result/bin/graalnix check .   # lint

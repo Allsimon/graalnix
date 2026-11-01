@@ -217,7 +217,8 @@ class CommandLineTest {
 
     @Test
     void evalTakesEngineOptions() {
-        assertThat(run("eval", "--engine.Compilation=false", "-E", "1 + 1")).isZero();
+        assertThat(run("eval", "--engine.WarnInterpreterOnly=false", "-E", "1 + 1"))
+                .isZero();
     }
 
     @Test
