@@ -2,6 +2,8 @@
   lib,
   stdenv,
   graalvmPackages,
+  fetchurl,
+  linkFarm,
 }:
 let
   jdk = graalvmPackages.graalvm-ce-musl;
@@ -40,29 +42,12 @@ let
   src = sources [ ];
   testSrc = sources testPaths;
 
-  # Every artifact is pinned by checksum in the module-info.java files, so this download is reproducible.
-  deps = stdenv.mkDerivation {
-    name = "graalnix-deps";
-    src = sources (testPaths ++ docPaths);
-    nativeBuildInputs = [ jdk ];
-    buildPhase = ''
-      runHook preBuild
-      export HOME=$TMPDIR MAVEN_REPOSITORY_LOCAL=$out/maven JENESIS_REPOSITORY_LOCAL=$out/modules
-      mkdir -p $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL
-      java -Djenesis.make.mode=source -Djenesis.dependency.pin=strict -Djenesis.test.skip=true build/jenesis/Make.java
-      runHook postBuild
-    '';
-    dontInstall = true;
-    dontFixup = true;
-    outputHashMode = "recursive";
-    outputHashAlgo = "sha256";
-    outputHash = "sha256-FPEyn5/ZJJZMFENBkvFcOtcsWmMMK674dhYSH4FASN8=";
-  };
+  deps = import ./pins.nix { inherit lib fetchurl linkFarm; } ../.;
 
   offline = ''
     export HOME=$TMPDIR MAVEN_REPOSITORY_LOCAL=$TMPDIR/maven JENESIS_REPOSITORY_LOCAL=$TMPDIR/modules
-    cp -r ${deps}/maven $MAVEN_REPOSITORY_LOCAL
-    cp -r ${deps}/modules $JENESIS_REPOSITORY_LOCAL
+    cp -rL ${deps}/maven $MAVEN_REPOSITORY_LOCAL
+    cp -rL ${deps}/modules $JENESIS_REPOSITORY_LOCAL
     chmod -R u+w $MAVEN_REPOSITORY_LOCAL $JENESIS_REPOSITORY_LOCAL
   '';
 

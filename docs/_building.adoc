@@ -44,13 +44,9 @@ stay pinned in their declarations, and those of the project plugins in
 
 == Nix
 
-`nix/package.nix` builds offline. A fixed-output `deps` derivation downloads
-every pinned artifact. After a pin changes, update its `outputHash`:
-
-[source,sh]
-----
-nix build .#graalnix.deps --rebuild
-----
+`nix/package.nix` builds offline. `nix/pins.nix` reads the pins of the module
+declarations and of both pin files, and fetches each pinned jar and POM, so a
+new pin needs nothing more.
 
 The flake provides `graalnix` (the native binary), `docs`, and a `tests` check
 that runs the test suite on the JVM and outputs its JaCoCo report.
