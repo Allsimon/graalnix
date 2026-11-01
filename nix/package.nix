@@ -101,7 +101,7 @@ let
     '';
   };
 
-  # The formatter as a Maven repository, for the IntelliJ plugin (Allsimon/devenv-intellij) to build against.
+  # The formatter and linter as a Maven repository, for the IntelliJ plugin (Allsimon/devenv-intellij) to build against.
   mavenRepo = stdenv.mkDerivation {
     name = "graalnix-maven-repo";
     src = lib.fileset.toSource {
@@ -111,7 +111,9 @@ let
         ../build.jenesis
         ../jenesis.properties
         ../format/src/main
+        ../lint/src/main
         ../parser/src/main
+        ../store/src/main
       ];
     };
     nativeBuildInputs = [ jdk ];
@@ -125,7 +127,7 @@ let
     installPhase = ''
       runHook preInstall
       mkdir -p $out/org/graalnix
-      cp -r target/stage/maven/output/org/graalnix/org.graalnix.{parser,format} $out/org/graalnix
+      cp -r target/stage/maven/output/org/graalnix/org.graalnix.{parser,format,lint,store} $out/org/graalnix
       runHook postInstall
     '';
   };
