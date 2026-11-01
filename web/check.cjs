@@ -1,4 +1,4 @@
-// Runs the formatter and linter test cases against the JavaScript build: node check.cjs graalnix.js <format tests> <lint cases>
+// Runs the formatter and linter test cases, and checks the highlighting, against the JavaScript build: node check.cjs graalnix.js <format tests> <lint cases>
 "use strict";
 const fs = require("fs");
 const path = require("path");
@@ -6,7 +6,12 @@ const [script, formatTests, lintCases] = process.argv.slice(2);
 const g = require(path.resolve(script));
 
 const WIDTH = 80;
-const read = file => fs.readFileSync(file, "utf8");
+const sources = [];
+const read = file => {
+  const src = fs.readFileSync(file, "utf8");
+  if (file.endsWith(".nix")) sources.push([file, src]);
+  return src;
+};
 const list = dir => fs.readdirSync(dir).sort();
 const skip = new Set(read(path.join(formatTests, "format-skip.txt")).split("\n")
   .map(l => l.replace(/#.*/, "").trim()).filter(l => l));
@@ -56,6 +61,47 @@ for (const file of list(lintCases).filter(f => f.endsWith(".nix") && !f.endsWith
   const fixed = JSON.parse(g.fix(src, WIDTH, 2, false));
   check(file + " fix", fixed.output ?? fixed.error.message, format(read(path.join(lintCases, base + ".fixed.nix")), 2, false));
 }
+
+function spans(src) {
+  const result = JSON.parse(g.highlight(src));
+  if (result.error) return "error: " + result.error.message;
+  let at = 0;
+  for (const [start, end, kind] of result.tokens) {
+    if (start < at || end <= start || end > src.length || !kind) return `bad span ${start}-${end} ${kind}`;
+    at = end;
+  }
+  return result.tokens.map(([start, end, kind]) => [kind, src.slice(start, end)]);
+}
+
+for (const [file, src] of sources) {
+  const result = spans(src);
+  check("highlight " + file, typeof result === "string" ? result : "ok", "ok");
+}
+const sample = [
+  "# c",
+  "{ x, y ? 2 }@args: rec {",
+  '  a.b = "s${x + "t"}\\n"; /* d */',
+  "  inherit (x) c;",
+  "  p = ./a/${y}.nix;",
+  "  i = ''",
+  "    l ''${'''",
+  "  '';",
+  "  e = map true x.map;",
+  "}",
+].join("\n");
+check("highlight sample", JSON.stringify(spans(sample)), JSON.stringify([
+  ["comment", "# c"], ["operator", "{"], ["param", "x"], ["operator", ","], ["param", "y"], ["operator", "?"],
+  ["number", "2"], ["operator", "}@"], ["param", "args"], ["operator", ":"], ["keyword", "rec"], ["operator", "{"],
+  ["attr", "a"], ["operator", "."], ["attr", "b"], ["operator", "="],
+  ["string", '"s'], ["interp", "${"], ["operator", "+"], ["string", '"t"'], ["interp", "}"], ["escape", "\\n"], ["string", '"'],
+  ["operator", ";"], ["comment", "/* d */"],
+  ["keyword", "inherit"], ["operator", "("], ["operator", ")"], ["attr", "c"], ["operator", ";"],
+  ["attr", "p"], ["operator", "="], ["path", "./a/"], ["interp", "${"], ["interp", "}"], ["path", ".nix"], ["operator", ";"],
+  ["attr", "i"], ["operator", "="], ["string", "''\n    l "], ["escape", "''$"], ["string", "{"], ["escape", "'''"],
+  ["string", "\n  ''"], ["operator", ";"],
+  ["attr", "e"], ["operator", "="], ["builtin", "map"], ["constant", "true"], ["operator", "."], ["operator", ";"],
+  ["operator", "}"],
+]));
 
 console.log(`${passed} passed, ${failed.length} failed`);
 for (const name of failed) console.log("FAILED " + name);

@@ -44,6 +44,10 @@ public final class Lexer {
         this.len = src.length();
     }
 
+    public int pos() {
+        return pos;
+    }
+
     private char at(int i) {
         return i < len ? src.charAt(i) : '\0';
     }
