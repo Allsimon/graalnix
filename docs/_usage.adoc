@@ -13,6 +13,9 @@ To format and lint only, `graalnix-lite` and `graalnix-lite-native` provide a
 `graalnix` command with only `format`, `check` and `fix`, without the evaluator
 and Truffle.
 
+Each package installs bash and zsh completions; `graalnix generate-completion`
+prints the script, to source in a shell where it is not installed.
+
 Evaluate an expression:
 
 [source,console]

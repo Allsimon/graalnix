@@ -1,6 +1,7 @@
 package org.graalnix.launcher;
 
 import org.graalnix.cli.Check;
+import org.graalnix.cli.Completion;
 import org.graalnix.cli.Fix;
 import org.graalnix.cli.Format;
 import picocli.CommandLine;
@@ -11,7 +12,7 @@ import picocli.CommandLine.ScopeType;
 @Command(
         name = "graalnix",
         description = "A Nix language implementation on GraalVM.",
-        subcommands = {Format.class, Check.class, Fix.class, Eval.class, DrvPath.class})
+        subcommands = {Format.class, Check.class, Fix.class, Eval.class, DrvPath.class, Completion.class})
 public final class Main {
     @Option(
             names = {"-h", "--help"},
